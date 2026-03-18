@@ -58,11 +58,22 @@ export function useHtmlStorage() {
     saveDocuments(documents.filter(doc => doc.id !== id));
   };
 
+  const importDocuments = (newDocs: HtmlDocument[], merge: boolean = true) => {
+    if (merge) {
+      const existingIds = new Set(documents.map(d => d.id));
+      const toAdd = newDocs.filter(d => !existingIds.has(d.id));
+      saveDocuments([...documents, ...toAdd]);
+    } else {
+      saveDocuments(newDocs);
+    }
+  };
+
   return {
     documents,
     createDocument,
     getDocument,
     updateDocument,
     deleteDocument,
+    importDocuments,
   };
 }

@@ -1,0 +1,149 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router';
+import { Button, message, Upload, Switch } from 'antd';
+import { ArrowLeftOutlined, DownloadOutlined, UploadOutlined, RocketOutlined } from '@ant-design/icons';
+import { useHtmlStorage } from '../hooks/useHtmlStorage';
+import type { HtmlDocument } from '../types/HtmlDocument';
+
+export default function Settings() {
+  const navigate = useNavigate();
+  const { documents, importDocuments } = useHtmlStorage();
+  const [isMerging, setIsMerging] = useState(true);
+
+  const handleExport = () => {
+    if (documents.length === 0) {
+      message.warning('No documents to export!');
+      return;
+    }
+    const dataStr = JSON.stringify(documents, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `html_engine_export_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    message.success('Documents exported successfully!');
+  };
+
+  const handleImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result as string;
+        const parsed = JSON.parse(result) as HtmlDocument[];
+        // Basic validation
+        if (!Array.isArray(parsed) || (parsed.length > 0 && !parsed[0].id)) {
+          throw new Error("Invalid document format");
+        }
+        
+        importDocuments(parsed, isMerging);
+        message.success(`Successfully imported documents!`);
+      } catch (err) {
+        console.error(err);
+        message.error('Failed to parse the JSON file. Ensure it is a valid export.');
+      }
+    };
+    reader.readAsText(file);
+    return false; // Prevent default upload behavior
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto p-6 md:p-12">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-emerald-900 dark:text-emerald-400 mb-2">
+            Data Management
+          </h1>
+          <p className="text-emerald-700 dark:text-emerald-500 max-w-2xl text-sm md:text-base leading-relaxed">
+            <strong>The local version of this app is 100% free forever.</strong> All of your HTML documents are completely private and safely stored inside your browser's local storage. This Data Management page guarantees you will always be able to export your files to your computer, and seamlessly import them back in.
+          </p>
+        </div>
+        <Button 
+          onClick={() => navigate('/')} 
+          icon={<ArrowLeftOutlined />}
+          className="text-gray-600 bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:text-emerald-400"
+        >
+          Back to Dashboard
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 xl:gap-8 items-stretch">
+         {/* Export Card */}
+         <div className="bg-white/90 dark:bg-gray-800/90 shadow-xl shadow-emerald-900/5 dark:shadow-none rounded-2xl p-8 border border-white/50 dark:border-gray-700 flex flex-col items-start gap-4 h-full">
+           <div className="bg-emerald-100 dark:bg-emerald-900/40 p-3 rounded-full text-emerald-600 dark:text-emerald-400">
+             <DownloadOutlined className="text-2xl" />
+           </div>
+           <div className="flex-1 w-full">
+             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Export Documents</h2>
+             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Actively download a lightweight, local JSON backup of your entire cache directly into your filesystem. Keep a safe copy of all your work offline.</p>
+           </div>
+           
+           <div className="w-full mt-auto pt-6">
+             <Button type="primary" size="large" icon={<DownloadOutlined />} onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 w-full">
+               Export Data (.json)
+             </Button>
+           </div>
+         </div>
+
+         {/* Import Card */}
+         <div className="bg-white/90 dark:bg-gray-800/90 shadow-xl shadow-purple-900/5 dark:shadow-none rounded-2xl p-8 border border-white/50 dark:border-gray-700 flex flex-col items-start gap-4 h-full">
+           <div className="bg-purple-100 dark:bg-purple-900/40 p-3 rounded-full text-purple-600 dark:text-purple-400">
+             <UploadOutlined className="text-2xl" />
+           </div>
+           <div className="flex-1 w-full flex flex-col">
+             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Import Documents</h2>
+             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-4">Upload a previously exported JSON payload. You can securely merge new files alongside existing ones, or fully overwrite your local storage.</p>
+             
+             <div className="mt-auto flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 w-full shadow-sm mb-2">
+                <span className="text-gray-600 dark:text-gray-300 font-medium text-sm">Merge Data</span>
+                <Switch 
+                  checked={!isMerging} 
+                  onChange={(checked) => setIsMerging(!checked)} 
+                  className={!isMerging ? "bg-red-500" : "bg-purple-500"}
+                />
+                <span className={!isMerging ? "text-red-600 dark:text-red-400 font-bold text-sm leading-tight text-right w-20" : "text-gray-400 dark:text-gray-500 text-sm leading-tight text-right w-20"}>
+                  Overwrite
+                </span>
+             </div>
+           </div>
+           
+           <div className="w-full mt-auto">
+             <Upload 
+               accept=".json" 
+               showUploadList={false} 
+               beforeUpload={handleImport}
+               className="w-full block [&_.ant-upload]:w-full"
+             >
+               <Button type="primary" size="large" icon={<UploadOutlined />} className="bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-500/20 w-full">
+                 Import JSON File
+               </Button>
+             </Upload>
+           </div>
+         </div>
+
+         {/* Upgrade to Pro Card */}
+         <div className="bg-gradient-to-br from-gray-900 to-gray-800 dark:from-gray-800 dark:to-gray-900 shadow-xl shadow-blue-900/10 rounded-2xl p-8 border border-gray-700 flex flex-col items-start gap-4 h-full text-white relative overflow-hidden group">
+           <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl transition-transform group-hover:scale-150 duration-500" />
+           <div className="bg-blue-500/20 p-3 rounded-full text-blue-400 relative z-10">
+             <RocketOutlined className="text-2xl" />
+           </div>
+           <div className="flex-1 w-full relative z-10 flex flex-col">
+             <h2 className="text-xl font-bold text-white mb-2">Upgrade to Pro</h2>
+             <p className="text-gray-400 text-sm leading-relaxed mb-4 text-justify">When moving to the upcoming Paid version (which includes secure cloud sync and persistent user accounts), you simply export your offline cache here, log in, and import your documents safely into your new cloud account!</p>
+           </div>
+           
+           <div className="w-full mt-auto relative z-10">
+             <Button type="primary" size="large" icon={<RocketOutlined />} onClick={() => navigate('/pro')} className="bg-blue-600 hover:bg-blue-500 border-none shadow-lg shadow-blue-500/30 w-full text-white hover:text-white">
+               Discover Pro Edition
+             </Button>
+           </div>
+         </div>
+
+      </div>
+    </div>
+  );
+}

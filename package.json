@@ -2,7 +2,9 @@
 	"name": "html-viewer",
 	"type": "module",
 	"scripts": {
-		"dev": "wrangler dev",
+		"dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+		"dev:api": "wrangler dev",
+		"dev:web": "npm run dev --prefix web",
 		"init": "npm install && npm install --prefix web",
 		"build": "npm run build --prefix web",
 		"deploy": "wrangler deploy --minify",
@@ -13,6 +15,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^25.5.0",
+		"concurrently": "^9.2.1",
 		"wrangler": "^4.75.0"
 	}
 }

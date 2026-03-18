@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { Button, Input, Form, message, Tooltip } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined, FormatPainterOutlined, CopyOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
-import { useThemeContext } from '../App';
+import { useThemeMode } from '../hooks/useThemeMode';
 
 import MonacoEditor from '@monaco-editor/react';
 import prettier from 'prettier/standalone';
@@ -14,7 +14,7 @@ export default function Editor() {
   const navigate = useNavigate();
   const { getDocument, createDocument, updateDocument } = useHtmlStorage();
   const [form] = Form.useForm();
-  const { isDark } = useThemeContext();
+  const { isDark } = useThemeMode();
   
   useEffect(() => {
     if (id) {

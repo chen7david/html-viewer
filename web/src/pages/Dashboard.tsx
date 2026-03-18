@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button, Table, Space, Popconfirm, Tooltip, Input } from 'antd';
-import { PlusOutlined, EditOutlined, EyeOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, EyeOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, MoonOutlined, SunOutlined, SettingOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
-import { useThemeContext } from '../App';
+import { useThemeMode } from '../hooks/useThemeMode';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { documents, deleteDocument } = useHtmlStorage();
   const [searchText, setSearchText] = useState('');
-  const { isDark, toggleTheme } = useThemeContext();
+  const { isDark, toggleTheme } = useThemeMode();
 
   const filteredDocuments = documents.filter(doc => 
     doc.name.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -77,51 +77,60 @@ export default function Dashboard() {
               HTML Document Engine
             </h1>
             <p className="text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl leading-relaxed">
-              Upload, edit, beautifully format, and execute flawless prints of your raw HTML documents. Built for clinical summaries, precise reporting, and developers who need perfect A4 pagination without layout breakage.
+              With the dawn of advanced AI tools that can generate files, many are far better at producing brilliantly formatted HTML than generating raw PDFs. As a perfect middle ground, we've created this tool: cleanly paste your HTML documents, edit them, and flawlessly print them out for a streamlined workflow without any page cutoffs!
             </p>
           </div>
         </div>
-        <Button 
-          onClick={toggleTheme} 
-          shape="circle" 
-          icon={isDark ? <SunOutlined className="text-yellow-400" /> : <MoonOutlined className="text-purple-600" />} 
-          size="large" 
-          className="shadow-sm border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 self-end md:self-auto"
-        />
+        <div className="flex gap-3 self-end md:self-auto">
+          <Tooltip title="Data Management & Backup">
+            <Button 
+              onClick={() => navigate('/settings')} 
+              shape="circle" 
+              icon={<SettingOutlined className="text-gray-600 dark:text-gray-300" />} 
+              size="large" 
+              className="shadow-sm border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:text-emerald-500"
+            />
+          </Tooltip>
+          <Button 
+            onClick={toggleTheme} 
+            shape="circle" 
+            icon={isDark ? <SunOutlined className="text-yellow-400" /> : <MoonOutlined className="text-purple-600" />} 
+            size="large" 
+            className="shadow-sm border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+          />
+        </div>
       </div>
 
-      {/* Main Dashboard Panel */}
-      <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md shadow-2xl shadow-emerald-900/5 dark:shadow-none rounded-2xl p-6 md:p-8 border border-white/50 dark:border-gray-700">
-        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
-          <Input.Search 
-            placeholder="Search documents by name or HTML content..." 
-            allowClear 
-            size="large"
-            onChange={(e) => setSearchText(e.target.value)}
-            className="max-w-md shadow-sm"
-            enterButton={<Button icon={<SearchOutlined />} className="bg-purple-500 border-none text-white hover:bg-purple-400 dark:bg-purple-600 dark:hover:bg-purple-500" />}
-          />
-          <Button 
-            type="primary" 
-            size="large" 
-            icon={<PlusOutlined />} 
-            onClick={() => navigate('/new')}
-            className="shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 bg-emerald-600 font-semibold px-6 w-full sm:w-auto transition-transform active:scale-95"
-          >
-            Create New Document
-          </Button>
-        </div>
+      {/* Main Dashboard Panel - Stripped UI Wrapper as Requested */}
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+        <Input.Search 
+          placeholder="Search documents by name or HTML content..." 
+          allowClear 
+          size="large"
+          onChange={(e) => setSearchText(e.target.value)}
+          className="max-w-md shadow-sm"
+          enterButton={<Button icon={<SearchOutlined />} className="bg-purple-500 border-none text-white hover:bg-purple-400 dark:bg-purple-600 dark:hover:bg-purple-500" />}
+        />
+        <Button 
+          type="primary" 
+          size="large" 
+          icon={<PlusOutlined />} 
+          onClick={() => navigate('/new')}
+          className="shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 bg-emerald-600 font-semibold px-6 w-full sm:w-auto transition-transform active:scale-95"
+        >
+          Create New Document
+        </Button>
+      </div>
 
-        <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
-          <Table 
-            dataSource={filteredDocuments} 
-            columns={columns} 
-            rowKey="id" 
-            pagination={{ pageSize: 8, className: "dark:text-white" }}
-            className="[&_.ant-table]:dark:bg-gray-900 [&_.ant-table-cell]:dark:bg-gray-800 [&_.ant-table-cell]:dark:text-gray-200 [&_.ant-table-thead_th]:dark:bg-gray-900"
-            locale={{ emptyText: <div className="p-8 text-gray-400 dark:text-gray-500">No HTML documents found. Get started by creating one!</div> }}
-          />
-        </div>
+      <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 shadow-xl shadow-emerald-900/5 dark:shadow-none">
+        <Table 
+          dataSource={filteredDocuments} 
+          columns={columns} 
+          rowKey="id" 
+          pagination={{ pageSize: 12, className: "dark:text-white mb-0 p-4" }}
+          className="bg-transparent"
+          locale={{ emptyText: <div className="p-8 text-gray-400 dark:text-gray-500">No HTML documents found. Get started by creating one!</div> }}
+        />
       </div>
     </div>
   );
