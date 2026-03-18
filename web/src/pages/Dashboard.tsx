@@ -1,58 +1,63 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { useNavigate } from 'react-router';
 import { Button, Table, Space, Popconfirm, Tooltip, Input } from 'antd';
-import { EyeOutlined, EditOutlined, DeleteOutlined, PlusOutlined, FileTextOutlined, SearchOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, EyeOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
-import type { HtmlDocument } from '../types/HtmlDocument';
+import { useThemeContext } from '../App';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { documents, deleteDocument } = useHtmlStorage();
   const [searchText, setSearchText] = useState('');
+  const { isDark, toggleTheme } = useThemeContext();
 
   const filteredDocuments = documents.filter(doc => 
-    doc.name.toLowerCase().includes(searchText.toLowerCase()) || 
+    doc.name.toLowerCase().includes(searchText.toLowerCase()) ||
     doc.content.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const columns = [
-    { 
-      title: 'Document Name', 
-      dataIndex: 'name', 
+    {
+      title: 'Document Name',
+      dataIndex: 'name',
       key: 'name',
-      render: (text: string) => <strong className="text-emerald-800 text-base">{text}</strong>
+      render: (text: string) => <span className="font-medium text-emerald-800 dark:text-emerald-400">{text}</span>,
     },
-    { 
-      title: 'Created', 
-      dataIndex: 'createdAt', 
-      key: 'createdAt', 
-      render: (val: number) => <span className="text-gray-500">{new Date(val).toLocaleDateString()} at {new Date(val).toLocaleTimeString()}</span> 
+    {
+      title: 'Created At',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (date: number) => <span className="text-gray-500 dark:text-gray-400">{new Date(date).toLocaleDateString()} {new Date(date).toLocaleTimeString()}</span>,
     },
-    { 
-      title: 'Last Updated', 
-      dataIndex: 'updatedAt', 
-      key: 'updatedAt', 
-      render: (val: number) => <span className="text-gray-500">{new Date(val).toLocaleDateString()} at {new Date(val).toLocaleTimeString()}</span> 
+    {
+      title: 'Last Updated',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      render: (date: number) => <span className="text-gray-500 dark:text-gray-400">{new Date(date).toLocaleDateString()} {new Date(date).toLocaleTimeString()}</span>,
     },
     {
       title: 'Actions',
-      key: 'action',
-      render: (_: unknown, record: HtmlDocument) => (
+      key: 'actions',
+      render: (_: unknown, record: { id: string }) => (
         <Space size="middle">
-          <Tooltip title="View Rendered HTML">
-            <Link to={`/render/${record.id}`}>
-              <Button icon={<EyeOutlined />} type="default" className="text-purple-600 border-purple-200 hover:bg-purple-50" />
-            </Link>
+          <Tooltip title="Preview & Print Document">
+            <Button type="primary" icon={<EyeOutlined />} onClick={() => navigate(`/render/${record.id}`)} className="bg-emerald-500 hover:bg-emerald-400 border-none shadow-md shadow-emerald-500/20" />
           </Tooltip>
-          <Tooltip title="Edit Source">
-            <Link to={`/edit/${record.id}`}>
-              <Button icon={<EditOutlined />} type="default" className="text-emerald-600 border-emerald-200 hover:bg-emerald-50" />
-            </Link>
+          <Tooltip title="Edit Source Code">
+            <Button icon={<EditOutlined />} onClick={() => navigate(`/edit/${record.id}`)} className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:bg-transparent dark:hover:bg-purple-900/40" />
           </Tooltip>
-          <Tooltip title="Delete">
-            <Popconfirm title="Delete this document?" onConfirm={() => deleteDocument(record.id)} okText="Delete" okType="danger">
-              <Button icon={<DeleteOutlined />} danger type="text" className="hover:bg-red-50" />
-            </Popconfirm>
-          </Tooltip>
+          <Popconfirm
+            title="Delete this document?"
+            description="Are you sure you want to completely delete this HTML document?"
+            onConfirm={() => deleteDocument(record.id)}
+            okText="Yes, Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+          >
+            <Tooltip title="Delete Document">
+              <Button danger icon={<DeleteOutlined />} className="dark:bg-transparent" />
+            </Tooltip>
+          </Popconfirm>
         </Space>
       ),
     },
@@ -60,40 +65,63 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto p-6 md:p-12">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-        <div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-purple-600 drop-shadow-sm flex items-center gap-3">
-            <FileTextOutlined className="text-emerald-500" />
-            HTML Viewer
-          </h1>
-          <p className="text-gray-500 mt-2 text-lg">Manage and preview your beautifully crafted HTML documents.</p>
+      
+      {/* Hero Landing Section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-6">
+        <div className="flex items-start gap-4">
+          <div className="bg-gradient-to-br from-emerald-500 to-purple-600 p-4 rounded-2xl shadow-lg shadow-purple-500/20 text-white shrink-0 mt-1">
+            <FileTextOutlined className="text-4xl" />
+          </div>
+          <div>
+            <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-purple-600 dark:from-emerald-400 dark:to-purple-400 tracking-tight mb-2">
+              HTML Document Engine
+            </h1>
+            <p className="text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-2xl leading-relaxed">
+              Upload, edit, beautifully format, and execute flawless prints of your raw HTML documents. Built for clinical summaries, precise reporting, and developers who need perfect A4 pagination without layout breakage.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-          <Input
-            placeholder="Search documents..."
-            prefix={<SearchOutlined className="text-gray-400" />}
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            className="rounded-lg border-emerald-200 hover:border-emerald-400 focus:border-purple-400 w-full md:w-64"
-            size="large"
-            allowClear
-          />
-          <Link to="/edit">
-            <Button type="primary" icon={<PlusOutlined />} size="large" className="w-full sm:w-auto shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all font-semibold px-6">
-              New Document
-            </Button>
-          </Link>
-        </div>
+        <Button 
+          onClick={toggleTheme} 
+          shape="circle" 
+          icon={isDark ? <SunOutlined className="text-yellow-400" /> : <MoonOutlined className="text-purple-600" />} 
+          size="large" 
+          className="shadow-sm border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 self-end md:self-auto"
+        />
       </div>
 
-      <div className="bg-white/80 backdrop-blur-md shadow-xl shadow-emerald-100/50 rounded-2xl overflow-hidden border border-emerald-50">
-        <Table 
-          dataSource={filteredDocuments} 
-          columns={columns} 
-          rowKey="id" 
-          pagination={{ pageSize: 15 }} 
-          className="p-2"
-        />
+      {/* Main Dashboard Panel */}
+      <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-md shadow-2xl shadow-emerald-900/5 dark:shadow-none rounded-2xl p-6 md:p-8 border border-white/50 dark:border-gray-700">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+          <Input.Search 
+            placeholder="Search documents by name or HTML content..." 
+            allowClear 
+            size="large"
+            onChange={(e) => setSearchText(e.target.value)}
+            className="max-w-md shadow-sm"
+            enterButton={<Button icon={<SearchOutlined />} className="bg-purple-500 border-none text-white hover:bg-purple-400 dark:bg-purple-600 dark:hover:bg-purple-500" />}
+          />
+          <Button 
+            type="primary" 
+            size="large" 
+            icon={<PlusOutlined />} 
+            onClick={() => navigate('/new')}
+            className="shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 bg-emerald-600 font-semibold px-6 w-full sm:w-auto transition-transform active:scale-95"
+          >
+            Create New Document
+          </Button>
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700">
+          <Table 
+            dataSource={filteredDocuments} 
+            columns={columns} 
+            rowKey="id" 
+            pagination={{ pageSize: 8, className: "dark:text-white" }}
+            className="[&_.ant-table]:dark:bg-gray-900 [&_.ant-table-cell]:dark:bg-gray-800 [&_.ant-table-cell]:dark:text-gray-200 [&_.ant-table-thead_th]:dark:bg-gray-900"
+            locale={{ emptyText: <div className="p-8 text-gray-400 dark:text-gray-500">No HTML documents found. Get started by creating one!</div> }}
+          />
+        </div>
       </div>
     </div>
   );

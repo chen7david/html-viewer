@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { Button, Input, Form, message, Tooltip } from 'antd';
 import { ArrowLeftOutlined, SaveOutlined, FormatPainterOutlined, CopyOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
+import { useThemeContext } from '../App';
 
 import MonacoEditor from '@monaco-editor/react';
 import prettier from 'prettier/standalone';
@@ -13,7 +14,8 @@ export default function Editor() {
   const navigate = useNavigate();
   const { getDocument, createDocument, updateDocument } = useHtmlStorage();
   const [form] = Form.useForm();
-
+  const { isDark } = useThemeContext();
+  
   useEffect(() => {
     if (id) {
       const doc = getDocument(id);
@@ -68,55 +70,55 @@ export default function Editor() {
     <div className="max-w-6xl mx-auto p-6 md:p-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-emerald-900 drop-shadow-sm flex items-center gap-3">
+          <h1 className="text-3xl font-bold tracking-tight text-emerald-900 dark:text-emerald-400 drop-shadow-sm flex items-center gap-3">
             {id ? 'Edit HTML Document' : 'Create New HTML Document'}
           </h1>
-          <p className="text-emerald-600 mt-1">Write your raw HTML code below with rich syntax highlighting.</p>
+          <p className="text-emerald-600 dark:text-emerald-500 mt-1">Write your raw HTML code below with rich syntax highlighting.</p>
         </div>
-        <Button onClick={() => navigate('/')} icon={<ArrowLeftOutlined />} className="text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 font-medium">
+        <Button onClick={() => navigate('/')} icon={<ArrowLeftOutlined />} className="text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-800/50 font-medium">
           Back to Dashboard
         </Button>
       </div>
-
-      <div className="bg-white/80 backdrop-blur-md shadow-xl shadow-emerald-100/50 rounded-2xl p-6 md:p-8 border border-emerald-50">
+      
+      <div className="bg-white/80 dark:bg-gray-800/90 backdrop-blur-md shadow-xl shadow-emerald-100/50 dark:shadow-none rounded-2xl p-6 md:p-8 border border-emerald-50 dark:border-gray-700">
         <Form form={form} layout="vertical" onFinish={onFinish} requiredMark="optional">
-          <Form.Item
-            label={<span className="text-emerald-800 font-semibold text-base">Document Name</span>}
-            name="name"
+          <Form.Item 
+            label={<span className="text-emerald-800 dark:text-emerald-300 font-semibold text-base">Document Name</span>} 
+            name="name" 
             rules={[{ required: true, message: 'Please input the document name!' }]}
           >
-            <Input
-              size="large"
-              placeholder="E.g., Landing Page Component..."
-              className="border-gray-300 focus:border-purple-400 hover:border-emerald-400 rounded-lg text-base"
+            <Input 
+              size="large" 
+              placeholder="E.g., Landing Page Component..." 
+              className="border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white focus:border-purple-400 hover:border-emerald-400 rounded-lg text-base"
             />
           </Form.Item>
-
+          
           <div className="flex justify-between items-end mb-2">
-            <label className="text-emerald-800 font-semibold text-base">Raw HTML Content</label>
-            <div className="flex gap-2">
-              <Tooltip title="Copy HTML to Clipboard">
-                <Button size="small" icon={<CopyOutlined />} onClick={handleCopy} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50">
-                  Copy Code
-                </Button>
-              </Tooltip>
-              <Tooltip title="Auto-format HTML via Prettier">
-                <Button size="small" icon={<FormatPainterOutlined />} onClick={handleFormat} className="text-purple-600 border-purple-200 hover:bg-purple-50">
-                  Format Code
-                </Button>
-              </Tooltip>
-            </div>
+             <label className="text-emerald-800 dark:text-emerald-300 font-semibold text-base">Raw HTML Content</label>
+             <div className="flex gap-2">
+               <Tooltip title="Copy HTML to Clipboard">
+                 <Button size="small" icon={<CopyOutlined />} onClick={handleCopy} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:bg-gray-900 dark:border-gray-700 dark:text-emerald-400 dark:hover:bg-gray-700">
+                   Copy Code
+                 </Button>
+               </Tooltip>
+               <Tooltip title="Auto-format HTML via Prettier">
+                 <Button size="small" icon={<FormatPainterOutlined />} onClick={handleFormat} className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-gray-900 dark:border-gray-700 dark:text-purple-400 dark:hover:bg-gray-700">
+                   Format Code
+                 </Button>
+               </Tooltip>
+             </div>
           </div>
-
-          <Form.Item
-            name="content"
+          
+          <Form.Item 
+            name="content" 
             rules={[{ required: true, message: 'Please input the HTML content!' }]}
-            className="mb-8 border border-gray-200 rounded-lg overflow-hidden shadow-inner"
+            className="mb-8 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-inner"
           >
             <MonacoEditor
               height="60vh"
               defaultLanguage="html"
-              theme="vs-dark"
+              theme={isDark ? "vs-dark" : "light"}
               options={{
                 minimap: { enabled: false },
                 wordWrap: 'on',
@@ -125,14 +127,14 @@ export default function Editor() {
               }}
             />
           </Form.Item>
-
+          
           <Form.Item className="mb-0 flex justify-end">
-            <Button
-              type="primary"
-              htmlType="submit"
-              size="large"
+            <Button 
+              type="primary" 
+              htmlType="submit" 
+              size="large" 
               icon={<SaveOutlined />}
-              className="shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 font-semibold px-8"
+              className="shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 bg-emerald-600 font-semibold px-8"
             >
               Save and Render
             </Button>

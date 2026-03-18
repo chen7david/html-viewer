@@ -1,47 +1,54 @@
+/* eslint-disable react-refresh/only-export-components */
 import { HashRouter, Routes, Route } from 'react-router';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, theme } from 'antd';
+import { createContext, useContext, useState, useEffect } from 'react';
 import Dashboard from './pages/Dashboard';
 import Editor from './pages/Editor';
 import Render from './pages/Render';
 
-function App() {
+export const ThemeContext = createContext({ isDark: false, toggleTheme: () => {} });
+export const useThemeContext = () => useContext(ThemeContext);
+
+export default function App() {
+  const [isDark, setIsDark] = useState(() => {
+    return localStorage.getItem('theme') === 'dark';
+  });
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDark]);
+
+  const toggleTheme = () => setIsDark(!isDark);
+
   return (
-    <ConfigProvider
-      theme={{
-        token: {
-          colorPrimary: '#10b981', // Emerald 500
-          colorInfo: '#8b5cf6',    // Violet 500
-          colorBgContainer: '#ffffff',
-          colorBgLayout: '#ecfdf5', // Emerald 50
-          borderRadius: 12,
-          fontFamily: 'Inter, system-ui, sans-serif',
-        },
-        components: {
-          Button: {
-            borderRadius: 8,
-            controlHeight: 40,
-            colorPrimaryHover: '#059669', // Emerald 600
+    <ThemeContext.Provider value={{ isDark, toggleTheme }}>
+      <ConfigProvider
+        theme={{
+          algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
+          token: {
+            colorPrimary: '#10b981', // emerald-500
+            colorInfo: '#8b5cf6', // violet-500
+            fontFamily: "'Inter', 'Segoe UI', sans-serif",
           },
-          Table: {
-            headerBg: '#f9fafb',
-            headerColor: '#374151',
-            borderRadius: 12,
-          },
-        },
-      }}
-    >
-      <div className="min-h-screen bg-emerald-50 font-sans text-gray-800 selection:bg-purple-200 selection:text-purple-900">
-        <HashRouter>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/edit" element={<Editor />} />
-            <Route path="/edit/:id" element={<Editor />} />
-            <Route path="/render/:id" element={<Render />} />
-          </Routes>
-        </HashRouter>
-      </div>
-    </ConfigProvider>
+        }}
+      >
+        <div className="min-h-screen transition-colors duration-300 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+          <HashRouter>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/new" element={<Editor />} />
+              <Route path="/edit/:id" element={<Editor />} />
+              <Route path="/render/:id" element={<Render />} />
+            </Routes>
+          </HashRouter>
+        </div>
+      </ConfigProvider>
+    </ThemeContext.Provider>
   );
 }
-
-export default App;

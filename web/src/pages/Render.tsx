@@ -9,7 +9,7 @@ export default function Render() {
   const navigate = useNavigate();
   const { getDocument } = useHtmlStorage();
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  
+
   const doc = id ? getDocument(id) : undefined;
 
   useEffect(() => {
@@ -63,9 +63,9 @@ export default function Render() {
       </style>
     `;
     if (doc.content.includes('</head>')) {
-       return doc.content.replace('</head>', `${styles}</head>`);
+      return doc.content.replace('</head>', `${styles}</head>`);
     } else {
-       return styles + doc.content;
+      return styles + doc.content;
     }
   })() : '';
 
@@ -79,13 +79,17 @@ export default function Render() {
       printIframe.style.top = '-10000px';
       printIframe.style.left = '-10000px';
       printIframe.style.width = '210mm'; // Render at exact A4 width for correct scaling
-      printIframe.style.height = '297mm'; 
+      printIframe.style.height = '297mm';
       printIframe.style.border = '0';
       document.body.appendChild(printIframe);
 
       const cDoc = printIframe.contentWindow?.document;
       if (cDoc) {
-        // 2. Write the decorated content and Trigger Print Native Dialog
+        // Temporarily override the main window title so the PDF printer headers use the document name!
+        const originalTitle = document.title;
+        document.title = doc.name;
+
+        // 2. Write the decorated content and Trigger Native Dialog
         cDoc.open();
         cDoc.write(decoratedContent);
         cDoc.close();
@@ -94,6 +98,9 @@ export default function Render() {
           setTimeout(() => {
             printIframe.contentWindow?.focus();
             printIframe.contentWindow?.print();
+
+            // Restore title and destroy iframe after printing completes
+            document.title = originalTitle;
             setTimeout(() => document.body.removeChild(printIframe), 3000);
           }, 300); // Tiny buffer for CSS rendering to settle
         };
@@ -110,9 +117,9 @@ export default function Render() {
       try {
         const updateHeight = () => {
           if (iframe.contentWindow) {
-             iframe.style.height = '10px';
-             const height = iframe.contentWindow.document.documentElement.scrollHeight;
-             iframe.style.height = `${height + 20}px`;
+            iframe.style.height = '10px';
+            const height = iframe.contentWindow.document.documentElement.scrollHeight;
+            iframe.style.height = `${height + 20}px`;
           }
         };
         updateHeight();
@@ -137,31 +144,31 @@ export default function Render() {
   if (!doc) return <div className="p-8 text-emerald-800 font-semibold flex items-center justify-center min-h-screen">Loading document...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center py-10">
-      
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col items-center py-10 transition-colors duration-300">
+
       {/* Top Toolbar */}
       <div className="w-[210mm] max-w-full px-4 md:px-0 mb-6 flex justify-between items-center">
-        <Button 
-          onClick={() => navigate('/')} 
+        <Button
+          onClick={() => navigate('/')}
           icon={<ArrowLeftOutlined />}
-          className="text-gray-600 bg-white border-gray-300 hover:bg-gray-50 hover:text-emerald-600 shadow-sm"
+          className="text-gray-600 bg-white border-gray-300 hover:bg-gray-50 hover:text-emerald-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:text-emerald-400 dark:hover:bg-gray-700 shadow-sm"
         >
           Back to Dashboard
         </Button>
         <Tooltip title="Print Document (Cmd+P)">
-          <Button 
-            type="primary" 
-            icon={<PrinterOutlined />} 
+          <Button
+            type="primary"
+            icon={<PrinterOutlined />}
             onClick={executePrint}
             className="shadow-md shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-500 font-medium px-6"
           >
-            Execute Perfect Print
+            Print
           </Button>
         </Tooltip>
       </div>
 
       {/* A4 Document Preview Container */}
-      <div className="w-[210mm] max-w-full bg-white shadow-2xl ring-1 ring-gray-200 mx-auto overflow-hidden">
+      <div className="w-[210mm] max-w-full bg-white shadow-2xl shadow-black/10 dark:shadow-emerald-900/20 ring-1 ring-gray-200 dark:ring-gray-700 mx-auto overflow-hidden">
         <iframe
           ref={iframeRef}
           title={doc.name}
