@@ -39,8 +39,10 @@ export default function Dashboard() {
       key: 'actions',
       render: (_: unknown, record: { id: string }) => (
         <Space size="middle">
-          <Tooltip title="Edit Source Code">
-            <Button size="large" icon={<EditOutlined />} onClick={() => navigate(`/edit/${record.id}`)} className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:bg-transparent dark:hover:bg-purple-900/40" />
+          <Tooltip title="Open Workspace">
+            <Button size="large" type="primary" icon={<EditOutlined />} onClick={() => navigate(`/edit/${record.id}`)} className="bg-emerald-500 hover:bg-emerald-400 border-none shadow-md shadow-emerald-500/20 px-6" >
+               Open
+            </Button>
           </Tooltip>
           <Popconfirm
             title="Delete this document?"
