@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { formatDistanceToNow, format } from 'date-fns';
 import { Button, Table, Space, Popconfirm, Tooltip, Input } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, MoonOutlined, SunOutlined, SettingOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
@@ -26,13 +27,25 @@ export default function Dashboard() {
       title: 'Created At',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date: number) => <span className="text-gray-500 dark:text-gray-400">{new Date(date).toLocaleDateString()} {new Date(date).toLocaleTimeString()}</span>,
+      render: (date: number) => (
+        <Tooltip title={format(date, 'MMM d, yyyy h:mm a')}>
+          <span className="text-gray-500 dark:text-gray-400 cursor-help border-b border-dashed border-gray-400 dark:border-gray-500">
+            {formatDistanceToNow(date, { addSuffix: true })}
+          </span>
+        </Tooltip>
+      ),
     },
     {
       title: 'Last Updated',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      render: (date: number) => <span className="text-gray-500 dark:text-gray-400">{new Date(date).toLocaleDateString()} {new Date(date).toLocaleTimeString()}</span>,
+      render: (date: number) => (
+        <Tooltip title={format(date, 'MMM d, yyyy h:mm a')}>
+          <span className="text-gray-500 dark:text-gray-400 cursor-help border-b border-dashed border-gray-400 dark:border-gray-500">
+            {formatDistanceToNow(date, { addSuffix: true })}
+          </span>
+        </Tooltip>
+      ),
     },
     {
       title: 'Actions',
