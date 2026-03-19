@@ -22,6 +22,22 @@ export default function Editor() {
   const [docId, setDocId] = useState(id);
   const [isLoaded, setIsLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const editorRef = useRef<any>(null);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SYNC_LINE') {
+        const line = parseInt(event.data.line, 10);
+        if (!isNaN(line) && editorRef.current) {
+          editorRef.current.revealLineInCenter(line);
+          editorRef.current.setPosition({ lineNumber: line, column: 1 });
+          editorRef.current.focus();
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Load document
   useEffect(() => {
@@ -86,9 +102,16 @@ export default function Editor() {
   };
 
   const decoratedContent = (() => {
+    const lines = debouncedContent.split('\n');
+    const injectedHtml = lines.map((line, i) => {
+      // Safely inject data-source-line into opening HTML tags
+      return line.replace(/<([a-zA-Z][a-zA-Z0-9\-]*)(?=[/\s>])/g, `<$1 data-source-line="${i + 1}"`);
+    }).join('\n');
+
     const styles = `
       <style>
-        body { padding: 15mm !important; box-sizing: border-box; font-family: sans-serif; }
+        body { padding: 15mm !important; box-sizing: border-box; font-family: sans-serif; cursor: pointer; }
+        [data-source-line]:hover { outline: 2px solid rgba(16, 185, 129, 0.4); outline-offset: -2px; transition: outline 0.1s; }
         @media print {
           @page { margin: 15mm; }
           body { padding: 0 !important; line-height: 1.3 !important; font-size: 11pt !important; }
@@ -97,13 +120,24 @@ export default function Editor() {
           p, div, ul, ol, h1, h2, h3, h4, table { margin-top: 0 !important; margin-bottom: 8pt !important; }
           .instruction-header, img, table, tr, td, th, .keep-together { page-break-inside: avoid !important; break-inside: avoid !important; }
           h1, h2, h3, h4, th { page-break-after: avoid !important; break-after: avoid !important; }
+          [data-source-line]:hover { outline: none !important; }
         }
       </style>
+      <script>
+        document.addEventListener('click', function(e) {
+          const target = e.target.closest('[data-source-line]');
+          if (target) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.parent.postMessage({ type: 'SYNC_LINE', line: target.getAttribute('data-source-line') }, '*');
+          }
+        }, true);
+      </script>
     `;
-    if (debouncedContent.includes('</head>')) {
-      return debouncedContent.replace('</head>', `${styles}</head>`);
+    if (injectedHtml.includes('</head>')) {
+      return injectedHtml.replace('</head>', `${styles}</head>`);
     } else {
-      return styles + debouncedContent;
+      return styles + injectedHtml;
     }
   })();
 
@@ -215,6 +249,7 @@ export default function Editor() {
               defaultLanguage="html"
               value={content}
               onChange={(val) => setContent(val || '')}
+              onMount={(editor) => { editorRef.current = editor; }}
               theme={isDark ? "vs-dark" : "light"}
               options={{
                 minimap: { enabled: false },
