@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button, Table, Space, Popconfirm, Tooltip, Input } from 'antd';
-import { PlusOutlined, EditOutlined, EyeOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, MoonOutlined, SunOutlined, SettingOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, MoonOutlined, SunOutlined, SettingOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
 import { useThemeMode } from '../hooks/useThemeMode';
 
@@ -12,8 +12,7 @@ export default function Dashboard() {
   const { isDark, toggleTheme } = useThemeMode();
 
   const filteredDocuments = documents.filter(doc => 
-    doc.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    doc.content.toLowerCase().includes(searchText.toLowerCase())
+    doc.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
   const columns = [
@@ -40,11 +39,8 @@ export default function Dashboard() {
       key: 'actions',
       render: (_: unknown, record: { id: string }) => (
         <Space size="middle">
-          <Tooltip title="Preview & Print Document">
-            <Button type="primary" icon={<EyeOutlined />} onClick={() => navigate(`/render/${record.id}`)} className="bg-emerald-500 hover:bg-emerald-400 border-none shadow-md shadow-emerald-500/20" />
-          </Tooltip>
           <Tooltip title="Edit Source Code">
-            <Button icon={<EditOutlined />} onClick={() => navigate(`/edit/${record.id}`)} className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:bg-transparent dark:hover:bg-purple-900/40" />
+            <Button size="large" icon={<EditOutlined />} onClick={() => navigate(`/edit/${record.id}`)} className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:bg-transparent dark:hover:bg-purple-900/40" />
           </Tooltip>
           <Popconfirm
             title="Delete this document?"
@@ -55,7 +51,7 @@ export default function Dashboard() {
             okButtonProps={{ danger: true }}
           >
             <Tooltip title="Delete Document">
-              <Button danger icon={<DeleteOutlined />} className="dark:bg-transparent" />
+              <Button size="large" danger icon={<DeleteOutlined />} className="dark:bg-transparent" />
             </Tooltip>
           </Popconfirm>
         </Space>

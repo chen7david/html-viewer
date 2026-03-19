@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Button, Input, Form, message, Tooltip } from 'antd';
-import { ArrowLeftOutlined, SaveOutlined, FormatPainterOutlined, CopyOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SaveOutlined, FormatPainterOutlined, CopyOutlined, EyeOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
 import { useThemeMode } from '../hooks/useThemeMode';
 
@@ -97,13 +97,20 @@ export default function Editor() {
           <div className="flex justify-between items-end mb-2">
              <label className="text-emerald-800 dark:text-emerald-300 font-semibold text-base">Raw HTML Content</label>
              <div className="flex gap-2">
+               {id && (
+                 <Tooltip title="Preview & Print Document">
+                   <Button size="middle" icon={<EyeOutlined />} onClick={() => navigate(`/render/${id}`)} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:bg-gray-900 dark:border-gray-700 dark:text-emerald-400 dark:hover:bg-gray-700 rounded-full font-medium px-4">
+                     View
+                   </Button>
+                 </Tooltip>
+               )}
                <Tooltip title="Copy HTML to Clipboard">
-                 <Button size="small" icon={<CopyOutlined />} onClick={handleCopy} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:bg-gray-900 dark:border-gray-700 dark:text-emerald-400 dark:hover:bg-gray-700">
+                 <Button size="middle" icon={<CopyOutlined />} onClick={handleCopy} className="text-emerald-600 border-emerald-200 hover:bg-emerald-50 dark:bg-gray-900 dark:border-gray-700 dark:text-emerald-400 dark:hover:bg-gray-700 rounded-full font-medium px-4">
                    Copy Code
                  </Button>
                </Tooltip>
                <Tooltip title="Auto-format HTML via Prettier">
-                 <Button size="small" icon={<FormatPainterOutlined />} onClick={handleFormat} className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-gray-900 dark:border-gray-700 dark:text-purple-400 dark:hover:bg-gray-700">
+                 <Button size="middle" icon={<FormatPainterOutlined />} onClick={handleFormat} className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:bg-gray-900 dark:border-gray-700 dark:text-purple-400 dark:hover:bg-gray-700 rounded-full font-medium px-4">
                    Format Code
                  </Button>
                </Tooltip>

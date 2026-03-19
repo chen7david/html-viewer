@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
 import { Button, Tooltip, message } from 'antd';
-import { ArrowLeftOutlined, PrinterOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PrinterOutlined, EditOutlined } from '@ant-design/icons';
 
 export default function Render() {
   const { id } = useParams();
@@ -155,16 +155,27 @@ export default function Render() {
         >
           Back to Dashboard
         </Button>
-        <Tooltip title="Print Document (Cmd+P)">
-          <Button
-            type="primary"
-            icon={<PrinterOutlined />}
-            onClick={executePrint}
-            className="shadow-md shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-500 font-medium px-6"
-          >
-            Print
-          </Button>
-        </Tooltip>
+        <div className="flex gap-3">
+          <Tooltip title="Edit Document">
+            <Button
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/edit/${doc.id}`)}
+              className="text-purple-600 border-purple-200 hover:bg-purple-50 dark:text-purple-400 dark:border-purple-800 dark:bg-transparent dark:hover:bg-purple-900/40 shadow-sm px-6 font-medium"
+            >
+              Edit
+            </Button>
+          </Tooltip>
+          <Tooltip title="Print Document (Cmd+P)">
+            <Button
+              type="primary"
+              icon={<PrinterOutlined />}
+              onClick={executePrint}
+              className="shadow-md shadow-emerald-500/20 bg-emerald-600 hover:bg-emerald-500 font-medium px-6"
+            >
+              Print
+            </Button>
+          </Tooltip>
+        </div>
       </div>
 
       {/* A4 Document Preview Container */}

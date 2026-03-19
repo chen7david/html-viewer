@@ -1,8 +1,12 @@
 # HTML Viewer Engine
 
-The HTML Viewer Engine is a powerful, local-storage-based web application designed to render, beautifully format, and flawlessly print your raw HTML documents. It is specifically built for handling clinical summaries, precise reporting, and raw HTML previews natively in the browser without CSS leakage.
+With the dawn of advanced AI tools that can produce text, many are far better at generating brilliantly formatted HTML structurally than they are at generating raw PDFs directly. As a perfect middle ground, we've created the **HTML Viewer Engine**: a powerful, local-storage-first web application designed to let you cleanly paste your AI-generated HTML documents, edit them in an embedded VS Code environment, and flawlessly print them out for a streamlined workflow without any page cutoffs!
 
 Live Deployment: [https://html.entix.org](https://html.entix.org)
+
+## Contributing & Feature Requests
+This tool is open-source and intended to help anyone stream-line handling raw HTML documents. 
+**If you are using this app and think it could use another feature, please create a Pull Request!** We openly welcome and invite community contributions, tweaks, and additions.
 
 ## Incredible Features
 
