@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
 import { Button, Tooltip, message } from 'antd';
 import { ArrowLeftOutlined, PrinterOutlined, EditOutlined } from '@ant-design/icons';
+import printJS from 'print-js';
 
 export default function Render() {
   const { id } = useParams();
@@ -73,38 +74,12 @@ export default function Render() {
   const executePrint = () => {
     if (!doc) return;
     try {
-      // 1. Create a pristine hidden iframe dedicated solely for printing
-      const printIframe = document.createElement('iframe');
-      printIframe.style.position = 'absolute';
-      printIframe.style.top = '-10000px';
-      printIframe.style.left = '-10000px';
-      printIframe.style.width = '210mm'; // Render at exact A4 width for correct scaling
-      printIframe.style.height = '297mm';
-      printIframe.style.border = '0';
-      document.body.appendChild(printIframe);
-
-      const cDoc = printIframe.contentWindow?.document;
-      if (cDoc) {
-        // Temporarily override the main window title so the PDF printer headers use the document name!
-        const originalTitle = document.title;
-        document.title = doc.name;
-
-        // 2. Write the decorated content and Trigger Native Dialog
-        cDoc.open();
-        cDoc.write(decoratedContent);
-        cDoc.close();
-
-        printIframe.onload = () => {
-          setTimeout(() => {
-            printIframe.contentWindow?.focus();
-            printIframe.contentWindow?.print();
-
-            // Restore title and destroy iframe after printing completes
-            document.title = originalTitle;
-            setTimeout(() => document.body.removeChild(printIframe), 3000);
-          }, 300); // Tiny buffer for CSS rendering to settle
-        };
-      }
+      printJS({
+        printable: decoratedContent,
+        type: 'raw-html',
+        documentTitle: doc.name,
+        scanStyles: false, // Prevents print-js from scanning current document styles; we rely on our injected <style>
+      });
     } catch (err) {
       message.error("Unable to execute isolated print. Please allow popups or check browser settings.");
       console.error(err);

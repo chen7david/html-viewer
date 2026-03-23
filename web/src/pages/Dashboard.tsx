@@ -12,7 +12,8 @@ export default function Dashboard() {
   const [searchText, setSearchText] = useState('');
   const { isDark, toggleTheme } = useThemeMode();
 
-  const filteredDocuments = documents.filter(doc => 
+  const sortedDocuments = [...documents].sort((a, b) => b.createdAt - a.createdAt);
+  const filteredDocuments = sortedDocuments.filter(doc => 
     doc.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
