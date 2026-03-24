@@ -1,6 +1,7 @@
 import { BookRepository } from '../repositories/BookRepository';
 import type { StoredBook } from '../repositories/BookRepository';
 import { AiParsingService } from './AiParsingService';
+import { SettingsRepository } from '../repositories/SettingsRepository';
 
 export class BookService {
   /**
@@ -16,7 +17,11 @@ export class BookService {
 
     const totalPages = storedBook.book.pages.length;
     const cleanedPages = [];
-    const CHUNK_SIZE = 15; // Process 15 pages in a single API prompt to save network limits
+    
+    // Dynamic Batch Resizing: Google Gemini has 1-2M token context limits. Local small models top out at 8k-128k.
+    // Optimal local token ingestion is 1,000 - 2,000 tokens per prompt. We clamp to 2 pages per batch for maximum local reasoning quality.
+    const aiConfig = SettingsRepository.getAiSettings();
+    const CHUNK_SIZE = aiConfig.activeProvider === 'gemini' ? 15 : 2; 
 
     for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
       const chunk = storedBook.book.pages.slice(i, i + CHUNK_SIZE);
