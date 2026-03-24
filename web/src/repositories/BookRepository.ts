@@ -45,8 +45,27 @@ export class BookRepository {
     return await get<StoredBook>(`${STORE_PREFIX}${id}`);
   }
 
+  // Warning: This loads ALL massive book data into browser RAM. Used strictly for full JSON backups.
+  static async getAllFullBooks(): Promise<StoredBook[]> {
+    const allStoreKeys = await keys();
+    const bookKeys = allStoreKeys.filter((k) => typeof k === 'string' && k.startsWith(STORE_PREFIX));
+    
+    const fullBooks: StoredBook[] = [];
+    for (const k of bookKeys) {
+      const fullBook = await get<StoredBook>(k);
+      if (fullBook) fullBooks.push(fullBook);
+    }
+    return fullBooks;
+  }
+
   static async saveBook(book: StoredBook): Promise<void> {
     await set(`${STORE_PREFIX}${book.id}`, book);
+  }
+
+  static async saveMultipleBooks(books: StoredBook[]): Promise<void> {
+    for (const book of books) {
+      await set(`${STORE_PREFIX}${book.id}`, book);
+    }
   }
 
   static async deleteBook(id: string): Promise<void> {
