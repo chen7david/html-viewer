@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button, message, Upload, Switch, Spin, Select, Tabs } from 'antd';
-import { DownloadOutlined, UploadOutlined, RocketOutlined, ApiOutlined, ReadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, UploadOutlined, RocketOutlined, ApiOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
 import type { HtmlDocument } from '../types/HtmlDocument';
 import { SettingsRepository } from '../repositories/SettingsRepository';
@@ -48,99 +48,74 @@ export default function Settings() {
     }
   }, [aiSettings.activeProvider, aiSettings.openWebUiEndpoint, aiSettings.openWebUiApiKey]);
 
-  const handleExport = () => {
-    if (documents.length === 0) {
-      message.warning('No documents to export!');
-      return;
-    }
-    const dataStr = JSON.stringify(documents, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `html_engine_export_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    message.success('HTML Documents exported successfully!');
-  };
-
-  const handleExportBooks = async () => {
+  const handleExportAll = async () => {
     setIsExportingBooks(true);
-    message.loading({ content: 'Gathering massive PDF data from IndexedDB...', key: 'exportBook' });
+    message.loading({ content: 'Assembling complete system backup...', key: 'exportAll' });
     try {
       const fullBooks = await BookRepository.getAllFullBooks();
-      if (fullBooks.length === 0) {
-        message.warning({ content: 'No PDF Books to export!', key: 'exportBook' });
-        return;
-      }
-      const dataStr = JSON.stringify(fullBooks, null, 2);
+      const payload = {
+        htmlDocuments: documents,
+        pdfBooks: fullBooks
+      };
+      const dataStr = JSON.stringify(payload, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `pdf_books_export_${new Date().toISOString().slice(0, 10)}.json`;
+      link.download = `universal_backup_${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      message.success({ content: 'PDF Books exported successfully! (Large File)', key: 'exportBook' });
+      message.success({ content: 'System Data exported successfully!', key: 'exportAll' });
     } catch (err) {
-      message.error({ content: 'Failed to export massive book files.', key: 'exportBook' });
+      message.error({ content: 'Failed to export massive system files.', key: 'exportAll' });
     } finally {
       setIsExportingBooks(false);
     }
   };
 
-  const handleImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const result = e.target?.result as string;
-        const parsed = JSON.parse(result) as HtmlDocument[];
-        // Basic validation
-        if (!Array.isArray(parsed) || (parsed.length > 0 && !parsed[0].id)) {
-          throw new Error("Invalid HTML document format");
-        }
-        
-        importDocuments(parsed, isMergingHtml);
-        message.success(`Successfully imported HTML documents!`);
-      } catch (err) {
-        console.error(err);
-        message.error('Failed to parse the JSON file. Ensure it is a valid export.');
-      }
-    };
-    reader.readAsText(file);
-    return false; // Prevent default upload behavior
-  };
-
-  const handleImportBooks = (file: File) => {
+  const handleImportAll = (file: File) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
-      message.loading({ content: 'Parsing massive JSON book data...', key: 'importBook' });
+      message.loading({ content: 'Restoring universal system data...', key: 'importAll' });
       try {
         const result = e.target?.result as string;
-        const parsed = JSON.parse(result) as StoredBook[];
-        // Basic validation
-        if (!Array.isArray(parsed) || (parsed.length > 0 && !parsed[0].book?.title)) {
-          throw new Error("Invalid PDF Book JSON format");
-        }
+        const parsed = JSON.parse(result);
         
-        // If they want to overwrite, technically we'd need to clear first. 
-        // For now, if not merging, we clear the entire DB first.
-        if (!isMergingBooks) {
-           const existing = await BookRepository.getAllBookSummaries();
-           for (const b of existing) {
-             await BookRepository.deleteBook(b.id);
-           }
+        let htmlPayload: HtmlDocument[] = [];
+        let pdfPayload: StoredBook[] = [];
+
+        if (parsed.htmlDocuments || parsed.pdfBooks) {
+          htmlPayload = parsed.htmlDocuments || [];
+          pdfPayload = parsed.pdfBooks || [];
+        } else if (Array.isArray(parsed)) {
+          // Fallback for legacy split-backups
+          if (parsed.length > 0 && parsed[0].id && !parsed[0].book) {
+             htmlPayload = parsed as HtmlDocument[];
+          } else if (parsed.length > 0 && parsed[0].book) {
+             pdfPayload = parsed as StoredBook[];
+          }
         }
 
-        await BookRepository.saveMultipleBooks(parsed);
-        message.success({ content: `Successfully imported ${parsed.length} PDF Books!`, key: 'importBook' });
+        if (htmlPayload.length > 0) {
+           importDocuments(htmlPayload, isMergingHtml);
+        }
+
+        if (pdfPayload.length > 0) {
+           if (!isMergingBooks) {
+             const existing = await BookRepository.getAllBookSummaries();
+             for (const b of existing) {
+               await BookRepository.deleteBook(b.id);
+             }
+           }
+           await BookRepository.saveMultipleBooks(pdfPayload);
+        }
+
+        message.success({ content: `Successfully restored ${htmlPayload.length} HTML docs and ${pdfPayload.length} PDF books!`, key: 'importAll' });
       } catch (err) {
         console.error(err);
-        message.error({ content: 'Failed to parse the massive JSON file.', key: 'importBook' });
+        message.error({ content: 'Failed to parse the JSON backup file. Ensure it is a valid export.', key: 'importAll' });
       }
     };
     reader.readAsText(file);
@@ -297,37 +272,37 @@ export default function Settings() {
             label: 'Local Storage Data',
             children: (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 xl:gap-8 items-stretch">
-         {/* Export Card */}
+         {/* Universal Export Card */}
          <div className="bg-white/90 dark:bg-gray-800/90 shadow-xl shadow-emerald-900/5 dark:shadow-none rounded-2xl p-8 border border-white/50 dark:border-gray-700 flex flex-col items-start gap-4 h-full">
            <div className="bg-emerald-100 dark:bg-emerald-900/40 p-3 rounded-full text-emerald-600 dark:text-emerald-400">
              <DownloadOutlined className="text-2xl" />
            </div>
            <div className="flex-1 w-full">
-             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Export Documents</h2>
-             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Actively download a lightweight, local JSON backup of your entire cache directly into your filesystem. Keep a safe copy of all your work offline.</p>
+             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Export Full System</h2>
+             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Download a complete universal JSON payload of your entire workspace, encapsulating both HTML documents and parsed IndexedDB PDF Books.</p>
            </div>
            
            <div className="w-full mt-auto pt-6">
-             <Button type="primary" size="large" icon={<DownloadOutlined />} onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 w-full">
-               Export Data (.json)
+             <Button type="primary" size="large" onClick={handleExportAll} disabled={isExportingBooks} icon={isExportingBooks ? <Spin size="small" /> : <DownloadOutlined />} className="bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/20 w-full disabled:bg-gray-400">
+               {isExportingBooks ? "Assembling Core..." : "Export Full Backup (.json)"}
              </Button>
            </div>
          </div>
 
-         {/* Import Card */}
+         {/* Universal Import Card */}
          <div className="bg-white/90 dark:bg-gray-800/90 shadow-xl shadow-purple-900/5 dark:shadow-none rounded-2xl p-8 border border-white/50 dark:border-gray-700 flex flex-col items-start gap-4 h-full">
            <div className="bg-purple-100 dark:bg-purple-900/40 p-3 rounded-full text-purple-600 dark:text-purple-400">
              <UploadOutlined className="text-2xl" />
            </div>
            <div className="flex-1 w-full flex flex-col">
-             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Import Documents</h2>
-             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-4">Upload a previously exported JSON payload. You can securely merge new files alongside existing ones, or fully overwrite your local storage.</p>
+             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Restore Full System</h2>
+             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-4">Restore a massive payload covering both your AI PDF libraries and your offline HTML workspace structures. Safely backward compatible with older segmented exports.</p>
              
              <div className="mt-auto flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 w-full shadow-sm mb-2">
                 <span className="text-gray-600 dark:text-gray-300 font-medium text-sm">Merge Data</span>
                 <Switch 
                   checked={!isMergingHtml} 
-                  onChange={(checked) => setIsMergingHtml(!checked)} 
+                  onChange={(checked) => { setIsMergingHtml(!checked); setIsMergingBooks(!checked); }} 
                   className={!isMergingHtml ? "bg-red-500" : "bg-purple-500"}
                 />
                 <span className={!isMergingHtml ? "text-red-600 dark:text-red-400 font-bold text-sm leading-tight text-right w-20" : "text-gray-400 dark:text-gray-500 text-sm leading-tight text-right w-20"}>
@@ -340,64 +315,11 @@ export default function Settings() {
              <Upload 
                accept=".json" 
                showUploadList={false} 
-               beforeUpload={handleImport}
+               beforeUpload={handleImportAll}
                className="w-full block [&_.ant-upload]:w-full"
              >
                <Button type="primary" size="large" icon={<UploadOutlined />} className="bg-purple-600 hover:bg-purple-500 shadow-lg shadow-purple-500/20 w-full">
-                 Import JSON File
-               </Button>
-             </Upload>
-           </div>
-         </div>
-
-         {/* PDF Books Export Card */}
-         <div className="bg-white/90 dark:bg-gray-800/90 shadow-xl shadow-blue-900/5 dark:shadow-none rounded-2xl p-8 border border-white/50 dark:border-gray-700 flex flex-col items-start gap-4 h-full">
-           <div className="bg-blue-100 dark:bg-blue-900/40 p-3 rounded-full text-blue-600 dark:text-blue-400">
-             <ReadOutlined className="text-2xl" />
-           </div>
-           <div className="flex-1 w-full">
-             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Export PDF Books</h2>
-             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Extract your massive library of deeply parsed AI PDF JSONs from your browser's IndexedDB. Warning: This file will be very large.</p>
-           </div>
-           
-           <div className="w-full mt-auto pt-6">
-             <Button type="primary" size="large" disabled={isExportingBooks} icon={isExportingBooks ? <Spin size="small" /> : <DownloadOutlined />} onClick={handleExportBooks} className="bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20 w-full disabled:bg-gray-400">
-               {isExportingBooks ? "Assembling Data..." : "Export Books (.json)"}
-             </Button>
-           </div>
-         </div>
-
-         {/* PDF Books Import Card */}
-         <div className="bg-white/90 dark:bg-gray-800/90 shadow-xl shadow-indigo-900/5 dark:shadow-none rounded-2xl p-8 border border-white/50 dark:border-gray-700 flex flex-col items-start gap-4 h-full">
-           <div className="bg-indigo-100 dark:bg-indigo-900/40 p-3 rounded-full text-indigo-600 dark:text-indigo-400">
-             <ReadOutlined className="text-2xl" />
-           </div>
-           <div className="flex-1 w-full flex flex-col">
-             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Import PDF Books</h2>
-             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-4">Upload a massive PDF backup JSON payload exported previously to instantly restore your IndexedDB library.</p>
-             
-             <div className="mt-auto flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 w-full shadow-sm mb-2">
-                <span className="text-gray-600 dark:text-gray-300 font-medium text-sm">Merge Data</span>
-                <Switch 
-                  checked={!isMergingBooks} 
-                  onChange={(checked) => setIsMergingBooks(!checked)} 
-                  className={!isMergingBooks ? "bg-red-500" : "bg-indigo-500"}
-                />
-                <span className={!isMergingBooks ? "text-red-600 dark:text-red-400 font-bold text-sm leading-tight text-right w-20" : "text-gray-400 dark:text-gray-500 text-sm leading-tight text-right w-20"}>
-                  Overwrite
-                </span>
-             </div>
-           </div>
-           
-           <div className="w-full mt-auto">
-             <Upload 
-               accept=".json" 
-               showUploadList={false} 
-               beforeUpload={handleImportBooks}
-               className="w-full block [&_.ant-upload]:w-full"
-             >
-               <Button type="primary" size="large" icon={<UploadOutlined />} className="bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-500/20 w-full">
-                 Import Books JSON
+                 Import Universal Backup
                </Button>
              </Upload>
            </div>
