@@ -10,7 +10,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 export interface ParsedPage {
   pageIndex: number;
-  inDocumentPageNumber?: number;
   text: string;
 }
 
@@ -75,14 +74,9 @@ export async function parsePdfFile(file: File): Promise<ParsedBook> {
       }
     }
 
-    // Attempt to extract the page number from the text (assuming it's usually at the start or end)
-    const pageNumberMatch = pageText.match(/\b\d+\b/); 
-    const extractedPageNum = pageNumberMatch ? parseInt(pageNumberMatch[0], 10) : pageNum;
-
     // Push the parsed page into our JSON array
     parsedBook.pages.push({
       pageIndex: pageNum,
-      inDocumentPageNumber: extractedPageNum,
       text: pageText
     });
   }

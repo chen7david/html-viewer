@@ -1,4 +1,15 @@
 import { SettingsRepository } from '../repositories/SettingsRepository';
+import { z } from 'zod';
+
+// Define the absolute truth schema for the AI Response to pass through at runtime
+const OutputChunkSchema = z.array(
+  z.object({
+    pageIndex: z.number(),
+    text: z.string(),
+  })
+);
+
+type OutputChunk = z.infer<typeof OutputChunkSchema>;
 
 export class AiParsingService {
   private static readonly API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
@@ -19,7 +30,7 @@ export class AiParsingService {
     pagesChunk: { pageIndex: number; text: string }[], 
     totalPages: number, 
     retryCount = 0
-  ): Promise<{ pageIndex: number; text: string }[]> {
+  ): Promise<OutputChunk> {
     const apiKey = SettingsRepository.getApiKey();
     if (!apiKey) {
       throw new Error("No Gemini API Key found in settings. Please configure it first.");
@@ -28,23 +39,18 @@ export class AiParsingService {
     const chunkIndexes = pagesChunk.map(p => p.pageIndex).join(', ');
 
     const prompt = `
-You are a highly capable document layout and content extraction AI.
-You are given a chunk of raw text extracted from multiple pages (Pages: ${chunkIndexes}) out of ${totalPages} of an eBook/PDF.
+You are a document extraction AI. Examine the raw text extracted from pages ${chunkIndexes} of an eBook (${totalPages} total).
 
-YOUR GOAL:
-1. Examine the text of each page provided in the JSON array. Determine if each page is the MAIN CONTENT of the book (i.e., narrative chapters, prologue, epilogue, actual book material).
-2. If a page is just a front cover, copyright page, acknowledgements, table of contents, or end-of-book index, you must completely ignore it (DO NOT include it in your output array).
-3. If it IS main content, perfectly format it. Remove stray page numbers, fix broken line breaks from the PDF scanner, format headings correctly, and return the cleaned up, perfectly readable text for that page.
-4. You MUST return a strictly valid JSON array containing exactly this format:
-[
-  { "pageIndex": number, "text": "Cleaned formatted text here..." }
-]
-DO NOT return any conversational text outside of the JSON array. Output purely valid JSON so it can be parsed programmatically.
+GOALS:
+1. Determine if each page in the input JSON array is MAIN CONTENT (narrative, chapters, prologue).
+2. IGNORE front covers, copyright pages, table of contents, or indexes (do not include them in your output array at all).
+3. For main content, clean up the text perfectly (remove stray page numbers, fix broken line breaks, format headings).
+4. CRITICAL: Preserve the exact original \`pageIndex\` for every page you extract.
 
-RAW PAGES CHUNK:
-"""
-${JSON.stringify(pagesChunk)}
-"""
+RAW INPUT PAGES CHUNK:
+---
+${pagesChunk.map(p => `PAGE ${p.pageIndex}:\n${p.text}`).join('\n---\n')}
+---
     `;
 
     try {
@@ -56,8 +62,26 @@ ${JSON.stringify(pagesChunk)}
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.1, // Low temperature for consistent formatting
-            responseMimeType: "application/json" // Force strict JSON output
+            temperature: 0.1, // Low temperature for factual structuring
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "ARRAY",
+              description: "A chronological list of cleanly formatted content pages that were extracted from the input chunk.",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  pageIndex: {
+                    type: "INTEGER",
+                    description: "The exact, perfectly preserved original pageIndex number provided in the input array. DO NOT change this."
+                  },
+                  text: {
+                    type: "STRING",
+                    description: "The beautifully formatted, clean text of the main content."
+                  }
+                },
+                required: ["pageIndex", "text"]
+              }
+            }
           }
         }),
       });
@@ -79,14 +103,12 @@ ${JSON.stringify(pagesChunk)}
       const data = await response.json();
       const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
       
-      // Safety parsing for markdown blocks if responseMimeType is ignored by older models
-      const cleanJsonStr = outputText.replace(/^```json/m, '').replace(/^```/m, '').trim();
+      // Parse the JSON. Gemini guarantees parsing directly via responseSchema.
+      const parsedRaw = JSON.parse(outputText);
       
-      const parsedArray = JSON.parse(cleanJsonStr);
-      if (!Array.isArray(parsedArray)) {
-         return [];
-      }
-      return parsedArray;
+      // Enforce Zod runtime validation to ensure Type Safety across our architecture (Global Rule 4)
+      const validatedArray = OutputChunkSchema.parse(parsedRaw);
+      return validatedArray;
     } catch (error) {
       console.error("AI Parsing Error chunking:", error);
       // Give a small automatic retry on random parsing failures just in case Context Window blew up

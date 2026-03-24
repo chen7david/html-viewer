@@ -30,14 +30,10 @@ export class BookService {
       // Re-integrate the valid returned JSON objects from the AI back into our true parsed page models
       for (const cleanedPage of cleanedChunk) {
         if (cleanedPage && cleanedPage.text && cleanedPage.text.trim() !== '') {
-          // Find original page to preserve any other metadata like inDocumentPageNumber
-          const original = chunk.find(c => c.pageIndex === cleanedPage.pageIndex);
-          if (original) {
-            cleanedPages.push({
-              ...original,
-              text: cleanedPage.text
-            });
-          }
+          cleanedPages.push({
+            pageIndex: cleanedPage.pageIndex,
+            text: cleanedPage.text
+          });
         }
       }
 

@@ -60,7 +60,7 @@ export default function BookViewer() {
       {book.pages.map((page, idx) => (
         <div key={idx} className="bg-white dark:bg-gray-800 p-8 shadow-sm rounded-xl border border-gray-100 dark:border-gray-700 relative">
           <div className="absolute top-4 right-4 bg-gray-100 dark:bg-gray-700 text-gray-400 text-xs px-2 py-1 rounded font-mono">
-            P. {page.inDocumentPageNumber} (Index {page.pageIndex})
+            Page {page.pageIndex}
           </div>
           <p className="text-gray-800 dark:text-gray-200 leading-relaxed font-serif whitespace-pre-wrap mt-4 text-base md:text-lg">
             {page.text || <span className="text-gray-400 italic">[Blank Page / Image Only]</span>}
