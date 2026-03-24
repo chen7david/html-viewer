@@ -5,6 +5,9 @@ import Editor from './pages/Editor';
 import Render from './pages/Render';
 import Settings from './pages/Settings';
 import Pro from './pages/Pro';
+import BooksDashboard from './pages/BooksDashboard';
+import BookViewer from './pages/BookViewer';
+import TopNavigation from './components/TopNavigation';
 import { ThemeProvider, useThemeMode } from './hooks/useThemeMode';
 
 function ThemedApp() {
@@ -28,16 +31,23 @@ function ThemedApp() {
         },
       }}
     >
-      <div className="min-h-screen transition-colors duration-300 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <div className="min-h-screen transition-colors duration-300 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col">
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/new" element={<Editor />} />
-            <Route path="/edit/:id" element={<Editor />} />
-            <Route path="/render/:id" element={<Render />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/pro" element={<Pro />} />
-          </Routes>
+          <TopNavigation />
+          <div className="flex-1">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/new" element={<Editor />} />
+              <Route path="/edit/:id" element={<Editor />} />
+              <Route path="/render/:id" element={<Render />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/pro" element={<Pro />} />
+              
+              {/* PDF Book Engine Routes */}
+              <Route path="/books" element={<BooksDashboard />} />
+              <Route path="/book/:id" element={<BookViewer />} />
+            </Routes>
+          </div>
         </BrowserRouter>
       </div>
     </ConfigProvider>

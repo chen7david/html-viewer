@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { formatDistanceToNow, format } from 'date-fns';
 import { Button, Table, Space, Popconfirm, Tooltip, Input } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, MoonOutlined, SunOutlined, SettingOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, FileTextOutlined, SearchOutlined, EditOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
-import { useThemeMode } from '../hooks/useThemeMode';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { documents, deleteDocument } = useHtmlStorage();
   const [searchText, setSearchText] = useState('');
-  const { isDark, toggleTheme } = useThemeMode();
 
   const sortedDocuments = [...documents].sort((a, b) => b.createdAt - a.createdAt);
   const filteredDocuments = sortedDocuments.filter(doc => 
@@ -94,22 +92,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex gap-3 self-end md:self-auto">
-          <Tooltip title="Data Management & Backup">
-            <Button 
-              onClick={() => navigate('/settings')} 
-              shape="circle" 
-              icon={<SettingOutlined className="text-gray-600 dark:text-gray-300" />} 
-              size="large" 
-              className="shadow-sm border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:text-emerald-500"
-            />
-          </Tooltip>
-          <Button 
-            onClick={toggleTheme} 
-            shape="circle" 
-            icon={isDark ? <SunOutlined className="text-yellow-400" /> : <MoonOutlined className="text-purple-600" />} 
-            size="large" 
-            className="shadow-sm border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-          />
+           {/* Navigation controls moved to global TopNavigation component */}
         </div>
       </div>
 

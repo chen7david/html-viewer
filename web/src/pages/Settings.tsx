@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button, message, Upload, Switch } from 'antd';
-import { ArrowLeftOutlined, DownloadOutlined, UploadOutlined, RocketOutlined } from '@ant-design/icons';
+import { DownloadOutlined, UploadOutlined, RocketOutlined, ApiOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
 import type { HtmlDocument } from '../types/HtmlDocument';
+import { SettingsRepository } from '../repositories/SettingsRepository';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { documents, importDocuments } = useHtmlStorage();
   const [isMerging, setIsMerging] = useState(true);
+  const [apiKey, setApiKey] = useState(SettingsRepository.getApiKey() || '');
 
   const handleExport = () => {
     if (documents.length === 0) {
@@ -50,6 +52,15 @@ export default function Settings() {
     return false; // Prevent default upload behavior
   };
 
+  const handleSaveApiKey = () => {
+    SettingsRepository.setApiKey(apiKey);
+    if (apiKey.trim() === '') {
+      message.info('API Key cleared successfully from local storage.');
+    } else {
+      message.success('Secured! Your API Key is safely stored in this browser strictly for local execution.');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-6 md:p-12">
       {/* Header */}
@@ -62,13 +73,34 @@ export default function Settings() {
             <strong>The local version of this app is 100% free forever.</strong> All of your HTML documents are completely private and safely stored inside your browser's local storage. This Data Management page guarantees you will always be able to export your files to your computer, and seamlessly import them back in.
           </p>
         </div>
-        <Button 
-          onClick={() => navigate('/')} 
-          icon={<ArrowLeftOutlined />}
-          className="text-gray-600 bg-white border-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:text-emerald-400"
-        >
-          Back to Dashboard
-        </Button>
+        <div></div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 xl:gap-8 items-stretch mb-8">
+        {/* API Settings Card */}
+        <div className="bg-white/90 dark:bg-gray-800/90 shadow-xl shadow-orange-900/5 dark:shadow-none rounded-2xl p-8 border border-white/50 dark:border-gray-700 flex flex-col items-start gap-4 h-full xl:col-span-3">
+           <div className="bg-orange-100 dark:bg-orange-900/40 p-3 rounded-full text-orange-600 dark:text-orange-400">
+             <ApiOutlined className="text-2xl" />
+           </div>
+           <div className="flex-1 w-full flex flex-col">
+             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Gemini AI Configuration (Advanced)</h2>
+             <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-4 max-w-4xl">
+               To utilize advanced semantic formatting of PDF Books (cleaning up covers, headers, and footers), you must provide your own <strong>Google AI Studio API Key</strong>. Because this app is 100% strictly local with no backend server, our code executes the API call entirely within your browser to keep your files secure and private.
+             </p>
+             <div className="flex items-center gap-4 mt-2 max-w-3xl w-full">
+               <input 
+                 type="password" 
+                 value={apiKey} 
+                 onChange={(e) => setApiKey(e.target.value)} 
+                 placeholder="Paste your Gemini AI Studio API Key here (AIzaSy...)" 
+                 className="flex-1 w-full bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white rounded-xl border border-gray-200 dark:border-gray-700 shadow-inner px-4 py-3 focus:outline-none focus:ring-2 ring-orange-400/50"
+               />
+               <Button type="primary" size="large" onClick={handleSaveApiKey} className="bg-orange-600 hover:bg-orange-500 shadow-lg shadow-orange-500/20 px-8">
+                 Securely Save
+               </Button>
+             </div>
+           </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 xl:gap-8 items-stretch">
