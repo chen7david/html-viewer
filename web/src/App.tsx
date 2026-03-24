@@ -7,6 +7,7 @@ import Settings from './pages/Settings';
 import Pro from './pages/Pro';
 import BooksDashboard from './pages/BooksDashboard';
 import BookViewer from './pages/BookViewer';
+import LinksDashboard from './pages/LinksDashboard';
 import TopNavigation from './components/TopNavigation';
 import { ThemeProvider, useThemeMode } from './hooks/useThemeMode';
 
@@ -46,6 +47,9 @@ function ThemedApp() {
               {/* PDF Book Engine Routes */}
               <Route path="/books" element={<BooksDashboard />} />
               <Route path="/book/:id" element={<BookViewer />} />
+              
+              {/* Links Engine Routes */}
+              <Route path="/links" element={<LinksDashboard />} />
             </Routes>
           </div>
         </BrowserRouter>

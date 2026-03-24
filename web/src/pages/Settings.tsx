@@ -7,6 +7,7 @@ import type { HtmlDocument } from '../types/HtmlDocument';
 import { SettingsRepository } from '../repositories/SettingsRepository';
 import { BookRepository } from '../repositories/BookRepository';
 import type { StoredBook } from '../repositories/BookRepository';
+import { LinksRepository } from '../repositories/LinksRepository';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -53,9 +54,11 @@ export default function Settings() {
     message.loading({ content: 'Assembling complete system backup...', key: 'exportAll' });
     try {
       const fullBooks = await BookRepository.getAllFullBooks();
+      const vaultLinks = await LinksRepository.getAllLinks();
       const payload = {
         htmlDocuments: documents,
-        pdfBooks: fullBooks
+        pdfBooks: fullBooks,
+        vaultLinks
       };
       const dataStr = JSON.stringify(payload, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
@@ -85,10 +88,12 @@ export default function Settings() {
 
         let htmlPayload: HtmlDocument[] = [];
         let pdfPayload: StoredBook[] = [];
+        let linksPayload: any[] = [];
 
-        if (parsed.htmlDocuments || parsed.pdfBooks) {
+        if (parsed.htmlDocuments || parsed.pdfBooks || parsed.vaultLinks) {
           htmlPayload = parsed.htmlDocuments || [];
           pdfPayload = parsed.pdfBooks || [];
+          linksPayload = parsed.vaultLinks || [];
         } else if (Array.isArray(parsed)) {
           // Fallback for legacy split-backups
           if (parsed.length > 0 && parsed[0].id && !parsed[0].book) {
@@ -112,7 +117,19 @@ export default function Settings() {
           await BookRepository.saveMultipleBooks(pdfPayload);
         }
 
-        message.success({ content: `Successfully restored ${htmlPayload.length} HTML docs and ${pdfPayload.length} PDF books!`, key: 'importAll' });
+        if (linksPayload.length > 0) {
+          if (!isMergingBooks) {
+            await LinksRepository.saveLinks(linksPayload);
+          } else {
+            const existing = await LinksRepository.getAllLinks();
+            // Deduplicate incoming links aggressively
+            const allLinks = [...existing, ...linksPayload];
+            const uniqueLinks = Array.from(new Map(allLinks.map(l => [l.id, l])).values());
+            await LinksRepository.saveLinks(uniqueLinks);
+          }
+        }
+
+        message.success({ content: `Successfully restored ${htmlPayload.length} HTML docs, ${pdfPayload.length} PDF books, and ${linksPayload.length} Deep Links!`, key: 'importAll' });
       } catch (err) {
         console.error(err);
         message.error({ content: 'Failed to parse the JSON backup file. Ensure it is a valid export.', key: 'importAll' });
@@ -282,7 +299,7 @@ export default function Settings() {
                   </div>
                   <div className="flex-1 w-full">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Export Full System</h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Download a complete universal JSON payload of your entire workspace, encapsulating both HTML documents and parsed IndexedDB PDF Books.</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed">Download a complete, monolithic universal JSON payload of your entire workspace, safely encapsulating your HTML cache, parsed IndexedDB PDF Books, and your Deep Links Vault.</p>
                   </div>
 
                   <div className="w-full mt-auto pt-6">
@@ -299,7 +316,7 @@ export default function Settings() {
                   </div>
                   <div className="flex-1 w-full flex flex-col">
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Restore Full System</h2>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-4">Restore a massive payload covering both your AI PDF libraries and your offline HTML workspace structures. Safely backward compatible with older segmented exports.</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-4">Restore a massive payload simultaneously covering your AI PDF libraries, offline HTML workspace structures, and Deep Links Vault. Implements safe backward compatibility routing with older split-JSON structural exports.</p>
 
                     <div className="mt-auto flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-800/40 p-4 rounded-xl border border-gray-100 dark:border-gray-700/50 w-full shadow-sm mb-2">
                       <span className="text-gray-600 dark:text-gray-300 font-medium text-sm">Merge Data</span>

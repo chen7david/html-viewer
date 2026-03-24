@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { FileTextOutlined, ReadOutlined, SettingOutlined, RocketOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons';
+import { FileTextOutlined, ReadOutlined, SettingOutlined, RocketOutlined, MoonOutlined, SunOutlined, LinkOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
 import { useThemeMode } from '../hooks/useThemeMode';
 
@@ -8,8 +8,24 @@ export default function TopNavigation() {
   const { isDark, toggleTheme } = useThemeMode();
 
   const navItems = [
-    { path: '/', label: 'HTML Engine', icon: <FileTextOutlined />, colorGroup: 'emerald' },
-    { path: '/books', label: 'PDF Books', icon: <ReadOutlined />, colorGroup: 'blue' },
+    { 
+      path: '/', 
+      label: 'HTML Engine', 
+      icon: <FileTextOutlined />, 
+      activeClass: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 shadow-sm border border-emerald-200 dark:border-emerald-800/50' 
+    },
+    { 
+      path: '/books', 
+      label: 'PDF Books', 
+      icon: <ReadOutlined />, 
+      activeClass: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 shadow-sm border border-blue-200 dark:border-blue-800/50' 
+    },
+    { 
+      path: '/links', 
+      label: 'Deep Links', 
+      icon: <LinkOutlined />, 
+      activeClass: 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 shadow-sm border border-teal-200 dark:border-teal-800/50' 
+    },
   ];
 
   const isActive = (path: string) => {
@@ -33,7 +49,7 @@ export default function TopNavigation() {
                 <div className={`
                   flex items-center gap-2 px-3 md:px-5 py-2 rounded-lg font-medium transition-all duration-200
                   ${isActive(item.path) 
-                    ? `bg-${item.colorGroup}-50 text-${item.colorGroup}-700 dark:bg-${item.colorGroup}-900/30 dark:text-${item.colorGroup}-400 shadow-sm border border-${item.colorGroup}-200 dark:border-${item.colorGroup}-800/50`
+                    ? item.activeClass
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 hover:text-gray-900 border border-transparent'
                   }
                 `}>
