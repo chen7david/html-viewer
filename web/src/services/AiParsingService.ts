@@ -11,6 +11,15 @@ const OutputChunkSchema = z.array(
 
 type OutputChunk = z.infer<typeof OutputChunkSchema>;
 
+const PROMPT_GUARDRAILS = `
+STRICT TEXT PRESERVATION RULES:
+- Do NOT summarize, shorten, paraphrase, or rewrite story content.
+- Keep all sentences and paragraph content from each kept page.
+- Only do light cleanup: remove OCR gibberish fragments, normalize line breaks, and fix obvious spacing.
+- If uncertain, preserve original wording exactly.
+- Your cleaned text length for a kept page should usually be close to the input page length.
+`;
+
 export class AiParsingService {
   private static readonly GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
@@ -42,6 +51,9 @@ GOALS:
 2. IGNORE front covers, copyright pages, table of contents, or indexes (do not include them in your output array at all).
 3. For main content, clean up the text perfectly (remove stray page numbers, fix broken line breaks, format headings).
 4. CRITICAL: Preserve the exact original \`pageIndex\` for every page you extract.
+5. CRITICAL: Never summarize or truncate the story/page text.
+
+${PROMPT_GUARDRAILS}
 
 RAW INPUT PAGES CHUNK:
 ---
@@ -67,6 +79,7 @@ ${pagesChunk.map(p => `PAGE ${p.pageIndex}:\n${p.text}`).join('\n---\n')}
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.1, // Low temperature for factual structuring
+              maxOutputTokens: 65536,
               responseMimeType: "application/json",
               responseSchema: {
                 type: "ARRAY",
@@ -115,7 +128,7 @@ ${pagesChunk.map(p => `PAGE ${p.pageIndex}:\n${p.text}`).join('\n---\n')}
         if (!aiConfig.openWebUiModelId) throw new Error("No Model ID provided for the Universal Node. Please configure it in Settings.");
 
         // OpenAI Schema explicitly demands JSON enforcement injected natively into prompt if JSON-Mode is enabled
-        const universalPrompt = prompt + `\n\nOUTPUT FORMAT:\nYou MUST STRICTLY output a raw JSON Array containing your mapped extracted objects like this:\n[\n  { "pageIndex": 1, "text": "cleaned content here..." }\n]\nDo not put markdown wrappers over it. Output strictly valid JSON.`;
+        const universalPrompt = prompt + `\n\n${PROMPT_GUARDRAILS}\n\nOUTPUT FORMAT:\nYou MUST STRICTLY output a raw JSON Array containing your mapped extracted objects like this:\n[\n  { "pageIndex": 1, "text": "cleaned content here..." }\n]\nDo not put markdown wrappers over it. Output strictly valid JSON.`;
 
         // Local models vary heavily in inference speed. Qwen runs faster, GLM runs heavier.
         const isQwen = aiConfig.openWebUiModelId.toLowerCase().includes('qwen');

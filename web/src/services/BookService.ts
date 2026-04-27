@@ -33,12 +33,20 @@ export class BookService {
       const chunkData = chunk.map(p => ({ pageIndex: p.pageIndex, text: p.text }));
       const cleanedChunk = await AiParsingService.processChunk(chunkData, storedBook.book.totalActualPages);
       
-      // Re-integrate the valid returned JSON objects from the AI back into our true parsed page models
+      const originalChunkMap = new Map(chunk.map((page) => [page.pageIndex, page.text]));
+
+      // Re-integrate valid returned JSON objects from the AI back into our parsed page models.
+      // If the model output is suspiciously short, keep the original text to prevent truncation.
       for (const cleanedPage of cleanedChunk) {
         if (cleanedPage && cleanedPage.text && cleanedPage.text.trim() !== '') {
+          const originalText = originalChunkMap.get(cleanedPage.pageIndex) || '';
+          const originalLen = originalText.trim().length;
+          const cleanedLen = cleanedPage.text.trim().length;
+          const looksTruncated = originalLen > 120 && cleanedLen < Math.floor(originalLen * 0.35);
+
           cleanedPages.push({
             pageIndex: cleanedPage.pageIndex,
-            text: cleanedPage.text
+            text: looksTruncated ? originalText : cleanedPage.text
           });
         }
       }
