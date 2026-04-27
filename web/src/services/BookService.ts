@@ -4,6 +4,40 @@ import { AiParsingService } from './AiParsingService';
 import { SettingsRepository } from '../repositories/SettingsRepository';
 
 export class BookService {
+  private static isLikelyNonStoryPage(text: string): boolean {
+    const normalized = text.toLowerCase();
+    const nonStoryMarkers = [
+      'words to know',
+      'glossary',
+      'connections',
+      'writing',
+      'social studies',
+      'word count',
+      'all rights reserved',
+      'www.readinga-z.com',
+      'reading a-z',
+      'leveled book',
+      'level o',
+      'correlation',
+    ];
+    if (nonStoryMarkers.some((marker) => normalized.includes(marker))) {
+      return true;
+    }
+
+    const visibleChars = text.replace(/\s/g, '');
+    if (!visibleChars) return true;
+    const alphaMatches = text.match(/[A-Za-z]/g) || [];
+    const alphaRatio = alphaMatches.length / visibleChars.length;
+    return alphaRatio < 0.45;
+  }
+
+  private static isLikelyNarrativePage(text: string): boolean {
+    if (this.isLikelyNonStoryPage(text)) return false;
+    const sentenceLike = (text.match(/[.!?]["')\]]?\s/g) || []).length;
+    const wordCount = (text.match(/\b[\w'-]+\b/g) || []).length;
+    return sentenceLike >= 2 && wordCount >= 40;
+  }
+
   /**
    * Orchestrates the Gemini AI cleanup process on a previously parsed book.
    * Runs sequentially through all pages, filtering out covers/junk and semantically formatting the remaining text.
@@ -21,6 +55,7 @@ export class BookService {
     const originalPages = [...sourcePages];
     const totalPages = originalPages.length;
     const cleanedPages = [];
+    const includedStoryPageIndexes = new Set<number>();
 
     if (storedBook.book.totalActualPages > totalPages) {
       throw new Error(
@@ -52,21 +87,31 @@ export class BookService {
           const originalLen = originalText.trim().length;
           const cleanedLen = cleanedPage.text.trim().length;
           const looksTruncated = originalLen > 120 && cleanedLen < Math.floor(originalLen * 0.35);
+          const finalText = looksTruncated ? originalText : cleanedPage.text;
+
+          if (this.isLikelyNonStoryPage(finalText)) {
+            continue;
+          }
 
           cleanedPages.push({
             pageIndex: cleanedPage.pageIndex,
-            text: looksTruncated ? originalText : cleanedPage.text
+            text: finalText
           });
+          includedStoryPageIndexes.add(cleanedPage.pageIndex);
         }
       }
 
       // Persist each completed batch immediately so users can inspect partial progress
       // without waiting for the whole book to finish.
+      // Persist only likely story pages while still allowing safe fallback for missed narrative pages.
       const cleanedMap = new Map(cleanedPages.map((p) => [p.pageIndex, p.text]));
-      storedBook.book.pages = originalPages.map((page) => ({
-        pageIndex: page.pageIndex,
-        text: cleanedMap.get(page.pageIndex) ?? page.text,
-      }));
+      const currentStoryPages = originalPages
+        .filter((page) => includedStoryPageIndexes.has(page.pageIndex) || this.isLikelyNarrativePage(page.text))
+        .map((page) => ({
+          pageIndex: page.pageIndex,
+          text: cleanedMap.get(page.pageIndex) ?? page.text,
+        }));
+      storedBook.book.pages = currentStoryPages;
       storedBook.originalPages = [...originalPages];
       storedBook.aiProcessed = endIndex >= totalPages;
       await BookRepository.saveBook(storedBook);
@@ -81,10 +126,12 @@ export class BookService {
 
     // Keep all original pages and only replace text for pages the AI cleaned.
     const finalCleanedMap = new Map(cleanedPages.map((p) => [p.pageIndex, p.text]));
-    storedBook.book.pages = originalPages.map((page) => ({
-      pageIndex: page.pageIndex,
-      text: finalCleanedMap.get(page.pageIndex) ?? page.text,
-    }));
+    storedBook.book.pages = originalPages
+      .filter((page) => includedStoryPageIndexes.has(page.pageIndex) || this.isLikelyNarrativePage(page.text))
+      .map((page) => ({
+        pageIndex: page.pageIndex,
+        text: finalCleanedMap.get(page.pageIndex) ?? page.text,
+      }));
     storedBook.originalPages = [...originalPages];
     storedBook.aiProcessed = true;
     

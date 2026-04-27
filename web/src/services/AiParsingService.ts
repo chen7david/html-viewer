@@ -18,6 +18,13 @@ STRICT TEXT PRESERVATION RULES:
 - Only do light cleanup: remove OCR gibberish fragments, normalize line breaks, and fix obvious spacing.
 - If uncertain, preserve original wording exactly.
 - Your cleaned text length for a kept page should usually be close to the input page length.
+
+PAGE INCLUSION RULES (VERY IMPORTANT):
+- Keep ONLY story narrative pages (the actual tale/prose).
+- Exclude covers, title pages, copyright pages, leveled-book metadata, worksheets, questions/prompts, and publisher promo text.
+- Exclude glossary/word-list/vocabulary pages unless that content is clearly part of the story body.
+- Exclude pages that are mostly OCR noise, symbol soup, random fragments, or unreadable characters.
+- If a page has mostly noise but includes a small amount of clear story text, keep only the clear story text.
 `;
 
 export class AiParsingService {
@@ -48,7 +55,7 @@ You are a document extraction AI. Examine the raw text extracted from pages ${ch
 
 GOALS:
 1. Determine if each page in the input JSON array is MAIN CONTENT (narrative, chapters, prologue).
-2. IGNORE front covers, copyright pages, table of contents, or indexes (do not include them in your output array at all).
+2. IGNORE front covers, copyright pages, table of contents, indexes, vocabulary lists, glossaries, and end-of-book exercises (do not include them in your output array at all).
 3. For main content, clean up the text perfectly (remove stray page numbers, fix broken line breaks, format headings).
 4. CRITICAL: Preserve the exact original \`pageIndex\` for every page you extract.
 5. CRITICAL: Never summarize or truncate the story/page text.
