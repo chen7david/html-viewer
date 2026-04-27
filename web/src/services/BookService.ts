@@ -15,9 +15,18 @@ export class BookService {
     const storedBook = await BookRepository.getBookById(bookId);
     if (!storedBook) throw new Error("Book not found in database.");
 
-    const originalPages = [...storedBook.book.pages];
+    const sourcePages = (storedBook.originalPages && storedBook.originalPages.length > 0)
+      ? storedBook.originalPages
+      : storedBook.book.pages;
+    const originalPages = [...sourcePages];
     const totalPages = originalPages.length;
     const cleanedPages = [];
+
+    if (storedBook.book.totalActualPages > totalPages) {
+      throw new Error(
+        "This book no longer has all original pages stored. Please re-upload the PDF once to restore full pages, then run AI clean again."
+      );
+    }
     
     const aiConfig = SettingsRepository.getAiSettings();
     const defaultChunkSize = aiConfig.activeProvider === 'gemini' ? 15 : 2;
@@ -58,6 +67,7 @@ export class BookService {
         pageIndex: page.pageIndex,
         text: cleanedMap.get(page.pageIndex) ?? page.text,
       }));
+      storedBook.originalPages = [...originalPages];
       storedBook.aiProcessed = endIndex >= totalPages;
       await BookRepository.saveBook(storedBook);
 
@@ -75,6 +85,7 @@ export class BookService {
       pageIndex: page.pageIndex,
       text: finalCleanedMap.get(page.pageIndex) ?? page.text,
     }));
+    storedBook.originalPages = [...originalPages];
     storedBook.aiProcessed = true;
     
     await BookRepository.saveBook(storedBook);

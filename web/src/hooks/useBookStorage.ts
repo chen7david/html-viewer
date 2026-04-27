@@ -32,6 +32,7 @@ export function useBookStorage() {
     const newBook: StoredBook = {
       id,
       book,
+      originalPages: [...book.pages],
       createdAt: Date.now(),
       aiProcessed: false
     };

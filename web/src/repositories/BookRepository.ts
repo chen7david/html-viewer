@@ -4,6 +4,7 @@ import type { ParsedBook } from '../utils/pdfParser';
 export interface StoredBook {
   id: string;
   book: ParsedBook;
+  originalPages?: ParsedBook['pages'];
   createdAt: number;
   aiProcessed: boolean;
 }
