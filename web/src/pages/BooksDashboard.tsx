@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { formatDistanceToNow, format } from 'date-fns';
 import { Button, Table, Space, Popconfirm, Tooltip, Input, message } from 'antd';
-import { PlusOutlined, ReadOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
+import { PlusOutlined, ReadOutlined, DeleteOutlined, SearchOutlined, RobotOutlined, Spin } from '@ant-design/icons';
 import { useBookStorage } from '../hooks/useBookStorage';
 import { parsePdfFile } from '../utils/pdfParser';
+import { BookService } from '../services/BookService';
 
 export default function BooksDashboard() {
   const navigate = useNavigate();
-  const { books, isLoading, saveBook, deleteBook } = useBookStorage();
+  const { books, isLoading, saveBook, deleteBook, reloadMetadata } = useBookStorage();
   const [searchText, setSearchText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [processingBookId, setProcessingBookId] = useState<string | null>(null);
 
   const filteredBooks = books.filter(b => 
     b.book.title.toLowerCase().includes(searchText.toLowerCase())
@@ -34,6 +36,22 @@ export default function BooksDashboard() {
       setIsUploading(false);
       hideLoading();
       event.target.value = ''; // Reset input
+    }
+  };
+
+  const handleAiClean = async (bookId: string, title: string) => {
+    setProcessingBookId(bookId);
+    const hideLoading = message.loading(`AI cleaning "${title}" in background...`, 0);
+    try {
+      await BookService.processBookWithAi(bookId);
+      await reloadMetadata();
+      message.success(`Finished AI cleaning "${title}".`);
+    } catch (error: any) {
+      console.error(error);
+      message.error(error?.message || `Failed to AI-clean "${title}".`);
+    } finally {
+      hideLoading();
+      setProcessingBookId(null);
     }
   };
 
@@ -65,8 +83,21 @@ export default function BooksDashboard() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: unknown, record: { id: string }) => (
+      render: (_: unknown, record: { id: string; aiProcessed?: boolean; book: { title: string } }) => (
         <Space size="middle">
+          {!record.aiProcessed && (
+            <Tooltip title="Clean this book with AI without opening it">
+              <Button
+                size="large"
+                icon={processingBookId === record.id ? <Spin size="small" /> : <RobotOutlined />}
+                disabled={processingBookId !== null}
+                onClick={() => handleAiClean(record.id, record.book.title)}
+                className="text-orange-600 border-orange-300 hover:border-orange-500 hover:text-orange-500 dark:text-orange-400 dark:border-orange-700 dark:bg-orange-950/20"
+              >
+                AI Clean
+              </Button>
+            </Tooltip>
+          )}
           <Tooltip title="Open Book Viewer">
             <Button size="large" type="primary" icon={<ReadOutlined />} onClick={() => navigate(`/book/${record.id}`)} className="bg-blue-600 hover:bg-blue-500 border-none shadow-md shadow-blue-500/20 px-6" >
                Read

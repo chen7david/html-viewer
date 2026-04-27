@@ -15,7 +15,8 @@ export class BookService {
     const storedBook = await BookRepository.getBookById(bookId);
     if (!storedBook) throw new Error("Book not found in database.");
 
-    const totalPages = storedBook.book.pages.length;
+    const originalPages = [...storedBook.book.pages];
+    const totalPages = originalPages.length;
     const cleanedPages = [];
     
     const aiConfig = SettingsRepository.getAiSettings();
@@ -24,7 +25,7 @@ export class BookService {
     const throttleDelayMs = aiConfig.activeProvider === 'gemini' ? 4100 : 0;
 
     for (let i = 0; i < totalPages; i += chunkSize) {
-      const chunk = storedBook.book.pages.slice(i, i + chunkSize);
+      const chunk = originalPages.slice(i, i + chunkSize);
       const endIndex = Math.min(i + chunkSize, totalPages);
       
       if (onProgress) onProgress(endIndex, totalPages, `Analyzing Pages ${i + 1}-${endIndex} simultaneously...`);
@@ -44,7 +45,11 @@ export class BookService {
 
       // Persist each completed batch immediately so users can inspect partial progress
       // without waiting for the whole book to finish.
-      storedBook.book.pages = [...cleanedPages].sort((a, b) => a.pageIndex - b.pageIndex);
+      const cleanedMap = new Map(cleanedPages.map((p) => [p.pageIndex, p.text]));
+      storedBook.book.pages = originalPages.map((page) => ({
+        pageIndex: page.pageIndex,
+        text: cleanedMap.get(page.pageIndex) ?? page.text,
+      }));
       storedBook.aiProcessed = endIndex >= totalPages;
       await BookRepository.saveBook(storedBook);
 
@@ -56,8 +61,12 @@ export class BookService {
       }
     }
 
-    // Overwrite the book's pages array with the strictly curated AI pages
-    storedBook.book.pages = [...cleanedPages].sort((a, b) => a.pageIndex - b.pageIndex);
+    // Keep all original pages and only replace text for pages the AI cleaned.
+    const finalCleanedMap = new Map(cleanedPages.map((p) => [p.pageIndex, p.text]));
+    storedBook.book.pages = originalPages.map((page) => ({
+      pageIndex: page.pageIndex,
+      text: finalCleanedMap.get(page.pageIndex) ?? page.text,
+    }));
     storedBook.aiProcessed = true;
     
     await BookRepository.saveBook(storedBook);
