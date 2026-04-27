@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
-import { Button, message, Upload, Switch, Spin, Select, Tabs } from 'antd';
+import { Button, message, Upload, Switch, Spin, Select, Tabs, InputNumber } from 'antd';
 import { DownloadOutlined, UploadOutlined, RocketOutlined, ApiOutlined } from '@ant-design/icons';
 import { useHtmlStorage } from '../hooks/useHtmlStorage';
 import type { HtmlDocument } from '../types/HtmlDocument';
@@ -277,6 +277,45 @@ export default function Settings() {
                       )}
                     </>
                   )}
+
+                  <div className="mt-8 w-full max-w-4xl p-6 bg-white dark:bg-gray-900/60 rounded-3xl border border-gray-200 dark:border-gray-700/80 shadow-sm">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Batch Processing Controls</h3>
+                    <div className="flex flex-col md:flex-row md:items-center gap-6">
+                      <div className="flex-1">
+                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 block mb-2">Pages per batch</span>
+                        <InputNumber
+                          min={1}
+                          max={50}
+                          value={aiSettings.pagesPerBatch}
+                          onChange={(value) =>
+                            setAiSettings({
+                              ...aiSettings,
+                              pagesPerBatch: typeof value === 'number' ? value : 1
+                            })
+                          }
+                          className="w-full h-[48px] [&_.ant-input-number-input]:h-[46px]"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-0">
+                          Controls how many pages are sent in each AI request.
+                        </p>
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 block mb-2">Request throttling</span>
+                        <div className="flex items-center gap-3">
+                          <Switch
+                            checked={aiSettings.enableThrottling}
+                            onChange={(checked) => setAiSettings({ ...aiSettings, enableThrottling: checked })}
+                          />
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {aiSettings.enableThrottling ? 'Enabled (rate-limit safe)' : 'Disabled (max speed)'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 mb-0">
+                          Disable this when your endpoint has no strict request-per-minute limit.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="pt-8">
                     <Button type="primary" size="large" onClick={handleSaveAiSettings} className="bg-orange-600 hover:bg-orange-500 shadow-xl shadow-orange-500/20 px-10 h-14 rounded-2xl text-lg font-bold">

@@ -4,6 +4,8 @@ export interface AiProviderSettings {
   openWebUiEndpoint: string;
   openWebUiApiKey: string;
   openWebUiModelId: string;
+  pagesPerBatch: number;
+  enableThrottling: boolean;
 }
 
 export class SettingsRepository {
@@ -19,12 +21,19 @@ export class SettingsRepository {
       openWebUiEndpoint: 'https://proxy.your-cloudflare-domain.com/v1/chat/completions',
       openWebUiApiKey: '',
       openWebUiModelId: 'glm-4.7-flash:latest',
+      pagesPerBatch: 15,
+      enableThrottling: true,
     };
 
     if (raw) {
       try { 
         const parsed = JSON.parse(raw); 
-        return { ...defaults, ...parsed }; // Safely merge defaults so new fields never crash
+        const merged = { ...defaults, ...parsed };
+        merged.pagesPerBatch = Number.isFinite(merged.pagesPerBatch)
+          ? Math.max(1, Math.min(50, Math.floor(merged.pagesPerBatch)))
+          : defaults.pagesPerBatch;
+        merged.enableThrottling = Boolean(merged.enableThrottling);
+        return merged; // Safely merge defaults so new fields never crash
       } catch (e) {}
     }
 

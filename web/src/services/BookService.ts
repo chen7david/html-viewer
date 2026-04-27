@@ -18,14 +18,14 @@ export class BookService {
     const totalPages = storedBook.book.pages.length;
     const cleanedPages = [];
     
-    // Dynamic Batch Resizing: Google Gemini has 1-2M token context limits. Local small models top out at 8k-128k.
-    // Optimal local token ingestion is 1,000 - 2,000 tokens per prompt. We clamp to 2 pages per batch for maximum local reasoning quality.
     const aiConfig = SettingsRepository.getAiSettings();
-    const CHUNK_SIZE = aiConfig.activeProvider === 'gemini' ? 15 : 2; 
+    const defaultChunkSize = aiConfig.activeProvider === 'gemini' ? 15 : 2;
+    const chunkSize = Math.max(1, aiConfig.pagesPerBatch || defaultChunkSize);
+    const throttleDelayMs = aiConfig.activeProvider === 'gemini' ? 4100 : 0;
 
-    for (let i = 0; i < totalPages; i += CHUNK_SIZE) {
-      const chunk = storedBook.book.pages.slice(i, i + CHUNK_SIZE);
-      const endIndex = Math.min(i + CHUNK_SIZE, totalPages);
+    for (let i = 0; i < totalPages; i += chunkSize) {
+      const chunk = storedBook.book.pages.slice(i, i + chunkSize);
+      const endIndex = Math.min(i + chunkSize, totalPages);
       
       if (onProgress) onProgress(endIndex, totalPages, `Analyzing Pages ${i + 1}-${endIndex} simultaneously...`);
       
@@ -42,16 +42,22 @@ export class BookService {
         }
       }
 
-      // Google AI Studio Free Tier allows 15 requests per minute (4 seconds per req).
-      // Since we chunk 15 pages at a time, we barely hit this, but we maintain a 4.1s wait just to be bulletproof.
+      // Persist each completed batch immediately so users can inspect partial progress
+      // without waiting for the whole book to finish.
+      storedBook.book.pages = [...cleanedPages].sort((a, b) => a.pageIndex - b.pageIndex);
+      storedBook.aiProcessed = endIndex >= totalPages;
+      await BookRepository.saveBook(storedBook);
+
       if (endIndex < totalPages) {
-        if (onProgress) onProgress(endIndex, totalPages, `Cooling down API (15 RPM limit)...`);
-        await new Promise(resolve => setTimeout(resolve, 4100));
+        if (aiConfig.enableThrottling && throttleDelayMs > 0) {
+          if (onProgress) onProgress(endIndex, totalPages, `Cooling down API to avoid rate limits...`);
+          await new Promise(resolve => setTimeout(resolve, throttleDelayMs));
+        }
       }
     }
 
     // Overwrite the book's pages array with the strictly curated AI pages
-    storedBook.book.pages = cleanedPages;
+    storedBook.book.pages = [...cleanedPages].sort((a, b) => a.pageIndex - b.pageIndex);
     storedBook.aiProcessed = true;
     
     await BookRepository.saveBook(storedBook);
