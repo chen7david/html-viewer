@@ -8,7 +8,9 @@
 		"init": "npm install && npm install --prefix web",
 		"build": "npm run build --prefix web",
 		"deploy": "wrangler deploy --minify",
-		"cf-typegen": "wrangler types --env-interface CloudflareBindings"
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+		"build:api": "wrangler build",
+		"build:web": "npm run build --prefix web"
 	},
 	"dependencies": {
 		"hono": "^4.12.8"
