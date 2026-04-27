@@ -19,23 +19,53 @@ export default function BooksDashboard() {
   );
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
     setIsUploading(true);
-    const hideLoading = message.loading(`Parsing ${file.name} locally...`, 0);
-    
+    let successCount = 0;
+    let failedCount = 0;
+
     try {
-      const parsedBook = await parsePdfFile(file);
-      await saveBook(parsedBook);
-      message.success(`Successfully parsed and saved ${parsedBook.title}!`);
-    } catch (error) {
-      console.error(error);
-      message.error("Failed to parse PDF file. Ensure it is a valid document.");
+      // Process sequentially to avoid memory spikes from parsing many PDFs at once.
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const progressIndex = i + 1;
+        message.loading({
+          content: `Queue ${progressIndex}/${files.length}: Parsing ${file.name}...`,
+          key: 'pdf-upload-queue',
+          duration: 0,
+        });
+
+        try {
+          const parsedBook = await parsePdfFile(file);
+          await saveBook(parsedBook);
+          successCount += 1;
+          message.success({
+            content: `Queue ${progressIndex}/${files.length}: Saved ${parsedBook.title}`,
+            key: 'pdf-upload-queue',
+            duration: 1.5,
+          });
+        } catch (error) {
+          failedCount += 1;
+          console.error(error);
+          message.error({
+            content: `Queue ${progressIndex}/${files.length}: Failed ${file.name}`,
+            key: 'pdf-upload-queue',
+            duration: 2,
+          });
+        }
+      }
+
+      if (failedCount === 0) {
+        message.success(`Queue complete: ${successCount} PDF(s) parsed and saved.`);
+      } else {
+        message.warning(`Queue complete: ${successCount} succeeded, ${failedCount} failed.`);
+      }
     } finally {
       setIsUploading(false);
-      hideLoading();
-      event.target.value = ''; // Reset input
+      event.target.value = ''; // Reset input so same files can be selected again
+      message.destroy('pdf-upload-queue');
     }
   };
 
@@ -162,11 +192,12 @@ export default function BooksDashboard() {
             loading={isUploading}
             className="shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 bg-blue-600 font-semibold px-6 w-full transition-transform active:scale-95 pointer-events-none"
           >
-            {isUploading ? "Extracting..." : "Upload Local PDF"}
+            {isUploading ? "Queue Processing..." : "Upload Local PDFs"}
           </Button>
           <input 
             type="file" 
             accept="application/pdf"
+            multiple
             className="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer" 
             onChange={handleFileUpload}
             disabled={isUploading}
