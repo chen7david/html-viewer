@@ -9,6 +9,10 @@ import BooksDashboard from './pages/BooksDashboard';
 import BookViewer from './pages/BookViewer';
 import LinksDashboard from './pages/LinksDashboard';
 import MediaDashboard from './pages/MediaDashboard';
+import MediaBrowsePage from './pages/MediaBrowsePage';
+import MediaWatchPage from './pages/MediaWatchPage';
+import MediaPlaylistsPage from './pages/MediaPlaylistsPage';
+import MediaLayout from './layouts/MediaLayout';
 import TopNavigation from './components/TopNavigation';
 import { ThemeProvider, useThemeMode } from './hooks/useThemeMode';
 
@@ -53,7 +57,12 @@ function ThemedApp() {
               <Route path="/links" element={<LinksDashboard />} />
 
               {/* Media Library Routes */}
-              <Route path="/media" element={<MediaDashboard />} />
+              <Route path="/media" element={<MediaLayout />}>
+                <Route index element={<MediaDashboard />} />
+                <Route path="browse" element={<MediaBrowsePage />} />
+                <Route path="playlists" element={<MediaPlaylistsPage />} />
+                <Route path="watch/:mediaId" element={<MediaWatchPage />} />
+              </Route>
             </Routes>
           </div>
         </BrowserRouter>

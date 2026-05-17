@@ -14,8 +14,18 @@ export interface MediaFileRecord {
   duration?: number;
   width?: number;
   height?: number;
+  /** Standard quality tier, e.g. 1080p, 720p, 4K */
+  resolutionLabel?: string;
+  /** Custom title shown in UI (filename on disk unchanged) */
+  displayName?: string;
+  /** Tags added manually by the user */
+  userTags?: string[];
+  /** Searchable tags (derived + user tags) */
+  tags?: string[];
   fingerprint?: string;
   metadataStatus?: MediaMetadataStatus;
+  /** User star rating 1–5 */
+  rating?: number;
 }
 
 export type MediaLibraryScanStatus = 'indexing' | 'analyzing' | 'complete';
@@ -43,6 +53,13 @@ export interface MediaFilePageQuery {
   pageSize: number;
   search?: string;
   kind?: MediaKindFilter;
+  tags?: string[];
+  resolutionLabels?: string[];
+}
+
+export interface MediaBrowseFacets {
+  tags: string[];
+  resolutionLabels: string[];
 }
 
 export interface PaginatedResult<T> {
@@ -55,6 +72,8 @@ export interface PaginatedResult<T> {
 export interface DuplicateGroup {
   fingerprint: string;
   files: MediaFileRecord[];
+  /** Highest-resolution copy — keep this one on disk */
+  keeper: MediaFileRecord;
   wastedBytes: number;
 }
 

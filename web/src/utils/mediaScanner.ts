@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { DuplicateGroup, FolderProfile, MediaFileRecord, MediaKind } from '../types/Media';
 import { classifyMediaFile } from './mediaExtensions';
+import { compareByResolutionDesc } from './videoResolution';
 
 const CHUNK_SIZE = 64 * 1024;
 export const METADATA_TIMEOUT_MS = 8_000;
@@ -39,12 +40,15 @@ export async function verifyDirectoryPermission(
   return (await handle.requestPermission(opts)) === 'granted';
 }
 
+export const DELETED_FOLDER = '_deleted';
+
 async function walkDirectory(
   dirHandle: FileSystemDirectoryHandle,
   prefix: string,
   onFile: (file: File, relativePath: string) => void | Promise<void>,
 ): Promise<void> {
   for await (const entry of dirHandle.values()) {
+    if (!prefix && entry.name === DELETED_FOLDER) continue;
     const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.kind === 'directory') {
       await walkDirectory(entry as FileSystemDirectoryHandle, relativePath, onFile);
@@ -234,11 +238,16 @@ export function findDuplicateGroups(files: MediaFileRecord[]): DuplicateGroup[] 
 
   return Array.from(byFingerprint.entries())
     .filter(([, group]) => group.length > 1)
-    .map(([fingerprint, group]) => ({
-      fingerprint,
-      files: group.sort((a, b) => a.relativePath.localeCompare(b.relativePath)),
-      wastedBytes: group.slice(1).reduce((sum, f) => sum + f.size, 0),
-    }))
+    .map(([fingerprint, group]) => {
+      const sorted = [...group].sort(compareByResolutionDesc);
+      const keeper = sorted[0];
+      return {
+        fingerprint,
+        files: sorted,
+        keeper,
+        wastedBytes: sorted.slice(1).reduce((sum, f) => sum + f.size, 0),
+      };
+    })
     .sort((a, b) => b.wastedBytes - a.wastedBytes);
 }
 

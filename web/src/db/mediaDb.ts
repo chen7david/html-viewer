@@ -33,6 +33,13 @@ export class MediaDatabase extends Dexie {
       playlists: 'id, updatedAt',
       settings: 'key',
     });
+    this.version(3).stores({
+      scanMeta: 'id',
+      mediaFiles:
+        'id, scanId, metadataStatus, size, fingerprint, kind, relativePath, resolutionLabel, [scanId+metadataStatus], [scanId+kind], [scanId+resolutionLabel]',
+      playlists: 'id, updatedAt',
+      settings: 'key',
+    });
   }
 }
 

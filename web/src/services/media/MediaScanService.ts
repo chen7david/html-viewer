@@ -10,6 +10,7 @@ import {
   verifyDirectoryPermission,
   yieldToMain,
 } from '../../utils/mediaScanner';
+import { applyMediaTags } from '../../utils/mediaTags';
 import { MediaLibraryService } from './MediaLibraryService';
 
 export interface MediaScanCallbacks {
@@ -103,7 +104,7 @@ export class MediaScanService {
     for (let i = 0; i < collected.length; i++) {
       const { file, record } = collected[i];
       const fingerprint = await computeQuickFingerprint(file, record.relativePath);
-      const entry: MediaFileRecord = { ...record, fingerprint, metadataStatus: 'pending' };
+      const entry = applyMediaTags({ ...record, fingerprint, metadataStatus: 'pending' });
       batch.push(entry);
       fileCount += 1;
       totalBytes += entry.size;
@@ -186,7 +187,7 @@ export class MediaScanService {
           metadataSkipped += 1;
         }
 
-        await MediaFileRepository.upsert(scanId, target);
+        await MediaFileRepository.upsert(scanId, applyMediaTags(target));
 
         if (i % 5 === 0 || i === pending.length - 1) {
           await publishMeta(

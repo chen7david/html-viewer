@@ -33,4 +33,34 @@ export class MediaPlaylistService {
   static async delete(id: string): Promise<void> {
     await MediaPlaylistRepository.delete(id);
   }
+
+  static async addMedia(playlistId: string, mediaId: string): Promise<MediaPlaylist> {
+    const existing = await MediaPlaylistRepository.getById(playlistId);
+    if (!existing) throw new Error('Playlist not found.');
+    if (existing.mediaIds.includes(mediaId)) return existing;
+    const mediaIds = [...existing.mediaIds, mediaId];
+    await MediaPlaylistService.update(playlistId, { mediaIds });
+    return { ...existing, mediaIds, updatedAt: Date.now() };
+  }
+
+  static async removeMedia(playlistId: string, mediaId: string): Promise<MediaPlaylist> {
+    const existing = await MediaPlaylistRepository.getById(playlistId);
+    if (!existing) throw new Error('Playlist not found.');
+    const mediaIds = existing.mediaIds.filter((id) => id !== mediaId);
+    await MediaPlaylistService.update(playlistId, { mediaIds });
+    return { ...existing, mediaIds, updatedAt: Date.now() };
+  }
+
+  static async toggleMedia(playlistId: string, mediaId: string): Promise<MediaPlaylist> {
+    const existing = await MediaPlaylistRepository.getById(playlistId);
+    if (!existing) throw new Error('Playlist not found.');
+    if (existing.mediaIds.includes(mediaId)) {
+      return MediaPlaylistService.removeMedia(playlistId, mediaId);
+    }
+    return MediaPlaylistService.addMedia(playlistId, mediaId);
+  }
+
+  static async createAndAdd(name: string, mediaId: string): Promise<MediaPlaylist> {
+    return MediaPlaylistService.create(name, [mediaId]);
+  }
 }

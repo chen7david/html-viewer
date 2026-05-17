@@ -8,7 +8,10 @@ interface FileSystemHandlePermissionDescriptor {
 
 interface FileSystemDirectoryHandle extends FileSystemHandle {
   values(): AsyncIterableIterator<FileSystemHandle>;
-  getDirectoryHandle(name: string): Promise<FileSystemDirectoryHandle>;
+  getDirectoryHandle(
+    name: string,
+    options?: { create?: boolean },
+  ): Promise<FileSystemDirectoryHandle>;
   getFileHandle(name: string): Promise<FileSystemFileHandle>;
   queryPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
   requestPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>;
@@ -16,6 +19,10 @@ interface FileSystemDirectoryHandle extends FileSystemHandle {
 
 interface FileSystemFileHandle extends FileSystemHandle {
   getFile(): Promise<File>;
+  move(
+    destinationDirectoryHandle: FileSystemDirectoryHandle,
+    newName?: string,
+  ): Promise<void>;
 }
 
 interface Window {

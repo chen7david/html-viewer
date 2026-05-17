@@ -5,6 +5,8 @@ import type {
   MediaKindFilter,
   PaginatedResult,
 } from '../../types/Media';
+import { applyMediaTags, fileMatchesTags } from '../../utils/mediaTags';
+import { getResolutionLabel } from '../../utils/videoResolution';
 import { ensureMediaDbReady } from './MediaDbBootstrap';
 
 function stripScanId({ scanId: _scanId, ...file }: StoredMediaFile): MediaFileRecord {
@@ -13,7 +15,30 @@ function stripScanId({ scanId: _scanId, ...file }: StoredMediaFile): MediaFileRe
 
 function matchesSearch(file: MediaFileRecord, search: string): boolean {
   const q = search.toLowerCase();
-  return file.name.toLowerCase().includes(q) || file.relativePath.toLowerCase().includes(q);
+  const tagHit = (file.tags ?? []).some((t) => t.includes(q));
+  const display = file.displayName?.toLowerCase() ?? '';
+  return (
+    tagHit ||
+    display.includes(q) ||
+    file.name.toLowerCase().includes(q) ||
+    file.relativePath.toLowerCase().includes(q) ||
+    (file.resolutionLabel?.toLowerCase().includes(q) ?? false)
+  );
+}
+
+function normalizeFile(file: MediaFileRecord): MediaFileRecord {
+  const resolutionLabel =
+    file.resolutionLabel ?? getResolutionLabel(file.width, file.height);
+  const withResolution = { ...file, resolutionLabel };
+  if (withResolution.tags && withResolution.tags.length > 0) return withResolution;
+  return applyMediaTags(withResolution);
+}
+
+function matchesResolution(file: MediaFileRecord, labels: string[]): boolean {
+  if (labels.length === 0) return true;
+  const label = file.resolutionLabel ?? getResolutionLabel(file.width, file.height);
+  if (!label) return false;
+  return labels.includes(label);
 }
 
 export class MediaFileRepository {
@@ -34,6 +59,12 @@ export class MediaFileRepository {
   static async upsert(scanId: string, file: MediaFileRecord): Promise<void> {
     await MediaFileRepository.ready();
     await mediaDb.mediaFiles.put({ ...file, scanId });
+  }
+
+  static async deleteById(scanId: string, id: string): Promise<void> {
+    await MediaFileRepository.ready();
+    const row = await mediaDb.mediaFiles.get(id);
+    if (row?.scanId === scanId) await mediaDb.mediaFiles.delete(id);
   }
 
   static async countByScan(scanId: string): Promise<number> {
@@ -77,24 +108,74 @@ export class MediaFileRepository {
 
   static async queryPage(query: MediaFilePageQuery): Promise<PaginatedResult<MediaFileRecord>> {
     await MediaFileRepository.ready();
-    const { scanId, page, pageSize, search = '', kind = 'all' } = query;
+    const {
+      scanId,
+      page,
+      pageSize,
+      search = '',
+      kind = 'all',
+      tags = [],
+      resolutionLabels = [],
+    } = query;
 
-    let collection =
-      kind === 'all'
-        ? mediaDb.mediaFiles.where('scanId').equals(scanId)
-        : mediaDb.mediaFiles.where('[scanId+kind]').equals([scanId, kind]);
+    let rows = (await mediaDb.mediaFiles.where('scanId').equals(scanId).toArray())
+      .map(stripScanId)
+      .map(normalizeFile);
+
+    if (kind !== 'all') {
+      rows = rows.filter((f) => f.kind === kind);
+    }
+
+    if (resolutionLabels.length > 0) {
+      rows = rows.filter((f) => matchesResolution(f, resolutionLabels));
+    }
 
     if (search.trim()) {
       const term = search.trim();
-      collection = collection.filter((f) => matchesSearch(f, term));
+      rows = rows.filter((f) => matchesSearch(f, term));
     }
 
-    const sorted = await collection.sortBy('relativePath');
-    const total = sorted.length;
+    if (tags.length > 0) {
+      rows = rows.filter((f) => fileMatchesTags(f, tags));
+    }
+
+    rows.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+    const total = rows.length;
     const start = (page - 1) * pageSize;
-    const items = sorted.slice(start, start + pageSize);
+    const items = rows.slice(start, start + pageSize);
 
     return { items, total, page, pageSize };
+  }
+
+  static async getBrowseFacets(scanId: string, kind: MediaKindFilter = 'video'): Promise<{
+    tags: string[];
+    resolutionLabels: string[];
+  }> {
+    await MediaFileRepository.ready();
+    const tagSet = new Set<string>();
+    const resolutionSet = new Set<string>();
+
+    let collection = mediaDb.mediaFiles.where('scanId').equals(scanId);
+    if (kind !== 'all') {
+      collection = mediaDb.mediaFiles.where('[scanId+kind]').equals([scanId, kind]);
+    }
+
+    await collection.each((row) => {
+      const file = normalizeFile(stripScanId(row));
+      for (const tag of file.tags ?? []) tagSet.add(tag);
+      const label = file.resolutionLabel ?? getResolutionLabel(file.width, file.height);
+      if (label) resolutionSet.add(label);
+    });
+
+    const resolutionOrder = ['8K', '4K', '1440p', '1080p', '720p', '576p', '480p', '360p', '240p'];
+    const resolutionLabels = [...resolutionSet].sort(
+      (a, b) => resolutionOrder.indexOf(a) - resolutionOrder.indexOf(b),
+    );
+
+    return {
+      tags: [...tagSet].sort(),
+      resolutionLabels,
+    };
   }
 
   /** Stream all files for aggregate operations (folder profile, duplicate grouping). */

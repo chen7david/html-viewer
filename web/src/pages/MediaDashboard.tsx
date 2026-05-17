@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import {
   Alert,
   Button,
-  Checkbox,
   Input,
   Modal,
   Popconfirm,
@@ -20,23 +20,35 @@ import {
   DeleteOutlined,
   FolderOpenOutlined,
   PlayCircleOutlined,
-  PlusOutlined,
   ReloadOutlined,
   SoundOutlined,
+  EditOutlined,
+  UnorderedListOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import { formatDistanceToNow } from 'date-fns';
+import MediaEditMetadataModal from '../components/media/MediaEditMetadataModal';
+import MediaVideoPlayer from '../components/media/MediaVideoPlayer';
+import ResolutionBadge from '../components/media/ResolutionBadge';
+import { useMediaApp } from '../contexts/MediaAppContext';
 import { useMediaLibrary } from '../hooks/useMediaLibrary';
 import { MediaLibraryService, MediaPlaylistService, MediaScanService } from '../services/media';
-import type { DuplicateGroup, FolderProfile, MediaFileRecord, MediaPlaylist, MediaScanMeta } from '../types/Media';
+import type { DuplicateGroup, FolderProfile, MediaFileRecord } from '../types/Media';
 import { formatBytes, formatDuration } from '../utils/mediaExtensions';
-import { isDirectoryPickerSupported } from '../utils/mediaScanner';
+import { getMediaDisplayName } from '../utils/mediaDisplayName';
+import { DELETED_FOLDER, isDirectoryPickerSupported } from '../utils/mediaScanner';
 
 export default function MediaDashboard() {
-  const [scan, setScan] = useState<MediaScanMeta | null>(null);
-  const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  const [playlists, setPlaylists] = useState<MediaPlaylist[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const {
+    scan,
+    setScan,
+    directoryHandle,
+    setDirectoryHandle,
+    playlists,
+    isLoading,
+    reload: reloadApp,
+  } = useMediaApp();
   const [isScanning, setIsScanning] = useState(false);
   const [progressText, setProgressText] = useState('');
   const [activeTab, setActiveTab] = useState('library');
@@ -53,29 +65,13 @@ export default function MediaDashboard() {
   const [playingMedia, setPlayingMedia] = useState<MediaFileRecord | null>(null);
   const playerUrlRef = useRef<string | null>(null);
 
-  const [playlistModalOpen, setPlaylistModalOpen] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState('');
-  const [selectedForPlaylist, setSelectedForPlaylist] = useState<string[]>([]);
-
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null);
   const [playlistTracks, setPlaylistTracks] = useState<MediaFileRecord[]>([]);
 
-  const loadPersisted = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { scan: savedScan, directoryHandle: savedHandle, playlists: savedPlaylists } =
-        await MediaLibraryService.loadAppState();
-      setScan(savedScan ?? null);
-      setDirectoryHandle(savedHandle ?? null);
-      setPlaylists(savedPlaylists);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadPersisted();
-  }, [loadPersisted]);
+  const [editingFile, setEditingFile] = useState<MediaFileRecord | null>(null);
+  const [facetTags, setFacetTags] = useState<string[]>([]);
+  const [movingGroupId, setMovingGroupId] = useState<string | null>(null);
+  const [refiningDuplicates, setRefiningDuplicates] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -97,16 +93,30 @@ export default function MediaDashboard() {
       .catch(() => setDuplicateCount(0));
   }, [scan?.id, scan?.status, isScanning]);
 
+  const loadDuplicates = async () => {
+    if (!scan?.id) return;
+    setDuplicatesLoading(true);
+    try {
+      const groups = await MediaLibraryService.getDuplicateGroups(scan.id);
+      setDuplicates(groups);
+      setDuplicateCount(groups.length);
+    } finally {
+      setDuplicatesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!scan?.id || activeTab !== 'duplicates') return;
-    setDuplicatesLoading(true);
-    MediaLibraryService.getDuplicateGroups(scan.id)
-      .then((groups) => {
-        setDuplicates(groups);
-        setDuplicateCount(groups.length);
-      })
-      .finally(() => setDuplicatesLoading(false));
+    void loadDuplicates();
   }, [scan?.id, activeTab, isScanning]);
+
+  useEffect(() => {
+    if (!scan?.id) {
+      setFacetTags([]);
+      return;
+    }
+    MediaLibraryService.getBrowseFacets(scan.id, 'all').then((f) => setFacetTags(f.tags));
+  }, [scan?.id]);
 
   useEffect(() => {
     if (!scan?.id || activeTab !== 'folders') return;
@@ -123,7 +133,9 @@ export default function MediaDashboard() {
   const scanCallbacks = {
     onProgress: setProgressText,
     onMetaUpdate: setScan,
-    onLibraryRefresh: library.refresh,
+    onLibraryRefresh: () => {
+      library.refresh();
+    },
   };
 
   const handlePickFolder = async () => {
@@ -133,6 +145,7 @@ export default function MediaDashboard() {
       const result = await MediaScanService.pickAndScanFolder(scanCallbacks);
       setScan(result.scan);
       setDirectoryHandle(result.directoryHandle);
+      await reloadApp();
       message.success(`Indexed ${result.scan.fileCount} media file(s) from "${result.scan.rootName}".`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to scan folder.';
@@ -211,6 +224,10 @@ export default function MediaDashboard() {
   };
 
   const playMedia = async (media: MediaFileRecord) => {
+    if (media.kind === 'video') {
+      navigate(`/media/watch/${media.id}`);
+      return;
+    }
     if (!directoryHandle) {
       message.error('Reconnect your folder before playback.');
       return;
@@ -247,40 +264,56 @@ export default function MediaDashboard() {
     }
   };
 
-  const openCreatePlaylist = (preselectedIds: string[] = []) => {
-    setSelectedForPlaylist(preselectedIds);
-    setNewPlaylistName('');
-    setPlaylistModalOpen(true);
-  };
-
-  const handleSavePlaylist = async () => {
-    if (!newPlaylistName.trim()) {
-      message.warning('Enter a playlist name.');
-      return;
-    }
-    if (selectedForPlaylist.length === 0) {
-      message.warning('Select at least one track.');
-      return;
-    }
-    await MediaPlaylistService.create(newPlaylistName, selectedForPlaylist);
-    const updated = await MediaPlaylistService.getAll();
-    setPlaylists(updated);
-    setPlaylistModalOpen(false);
-    message.success('Playlist saved to IndexedDB.');
-  };
-
   const handleDeletePlaylist = async (id: string) => {
     await MediaPlaylistService.delete(id);
-    const updated = await MediaPlaylistService.getAll();
-    setPlaylists(updated);
+    await reloadApp();
     if (activePlaylistId === id) setActivePlaylistId(null);
     message.success('Playlist deleted.');
   };
 
-  const togglePlaylistSelection = (id: string, checked: boolean) => {
-    setSelectedForPlaylist((prev) =>
-      checked ? [...prev, id] : prev.filter((x) => x !== id),
-    );
+  const handleRefineDuplicates = async () => {
+    if (!scan?.id || !directoryHandle) {
+      message.info('Reconnect your folder first.');
+      return;
+    }
+    setRefiningDuplicates(true);
+    try {
+      const count = await MediaLibraryService.refineDuplicatesOnDisk(scan.id, directoryHandle, setProgressText);
+      message.success(count > 0 ? `Deep-checked ${count} same-size file(s).` : 'No same-size candidates to check.');
+      await loadDuplicates();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Duplicate scan failed.');
+    } finally {
+      setRefiningDuplicates(false);
+      setProgressText('');
+    }
+  };
+
+  const handleMoveDuplicateCopies = async (group: DuplicateGroup) => {
+    if (!scan?.id || !directoryHandle) {
+      message.info('Reconnect your folder first.');
+      return;
+    }
+    setMovingGroupId(group.fingerprint);
+    try {
+      const { moved, errors } = await MediaLibraryService.moveDuplicateCopiesToDeleted(
+        scan.id,
+        directoryHandle,
+        group,
+      );
+      if (moved > 0) {
+        message.success(`Moved ${moved} duplicate(s) to ${DELETED_FOLDER}/. Delete them there when ready.`);
+      }
+      if (errors.length > 0) {
+        message.warning(errors.slice(0, 3).join(' · '));
+      }
+      await loadDuplicates();
+      library.refresh();
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Could not move files.');
+    } finally {
+      setMovingGroupId(null);
+    }
   };
 
   const libraryColumns = [
@@ -289,7 +322,10 @@ export default function MediaDashboard() {
       key: 'name',
       render: (_: unknown, record: MediaFileRecord) => (
         <div className="min-w-0">
-          <div className="font-semibold text-gray-800 dark:text-gray-200 truncate">{record.name}</div>
+          <div className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+            {getMediaDisplayName(record)}
+          </div>
+          <div className="text-xs text-gray-400 font-mono truncate">.{record.extension}</div>
           <div className="text-xs text-gray-500 truncate" title={record.relativePath}>
             {record.relativePath}
           </div>
@@ -327,28 +363,23 @@ export default function MediaDashboard() {
       key: 'resolution',
       width: 110,
       render: (_: unknown, record: MediaFileRecord) =>
-        record.kind === 'video' && record.width && record.height
-          ? `${record.width}×${record.height}`
-          : '—',
+        record.kind === 'video' ? <ResolutionBadge media={record} /> : '—',
     },
     {
       title: 'Actions',
       key: 'actions',
-      width: 200,
+      width: 240,
       render: (_: unknown, record: MediaFileRecord) => (
         <Space size="small">
           <Tooltip title="Play">
             <Button type="primary" icon={<PlayCircleOutlined />} onClick={() => playMedia(record)} />
           </Tooltip>
+          <Tooltip title="Edit name & tags">
+            <Button icon={<EditOutlined />} onClick={() => setEditingFile(record)} />
+          </Tooltip>
           <Tooltip title="Copy relative path">
             <Button icon={<CopyOutlined />} onClick={() => copyPath(record.relativePath)} />
           </Tooltip>
-          <Checkbox
-            checked={selectedForPlaylist.includes(record.id)}
-            onChange={(e) => togglePlaylistSelection(record.id, e.target.checked)}
-          >
-            <span className="text-xs">Playlist</span>
-          </Checkbox>
         </Space>
       ),
     },
@@ -373,32 +404,72 @@ export default function MediaDashboard() {
       title: 'Files',
       key: 'files',
       render: (_: unknown, record: DuplicateGroup) => (
-        <ul className="text-sm space-y-1 m-0 pl-4">
-          {record.files.map((f) => (
-            <li key={f.id} className="list-disc">
-              <span className="font-medium">{f.name}</span>
-              <span className="text-gray-500 ml-2">({f.relativePath})</span>
-            </li>
-          ))}
+        <ul className="text-sm space-y-2 m-0 pl-4">
+          {record.files.map((f) => {
+            const isKeeper = f.id === record.keeper.id;
+            return (
+              <li key={f.id} className={`list-disc ${isKeeper ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
+                <span className="font-medium">{getMediaDisplayName(f)}</span>
+                {f.kind === 'video' && (
+                  <span className="ml-2">
+                    <ResolutionBadge media={f} />
+                  </span>
+                )}
+                {isKeeper && <span className="ml-1 text-xs font-semibold">(keep)</span>}
+                <div className="text-gray-500 text-xs truncate" title={f.relativePath}>
+                  {f.relativePath}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       ),
     },
     {
-      title: 'Keep',
+      title: 'Keep (highest quality)',
       key: 'keep',
-      width: 280,
+      width: 260,
       render: (_: unknown, record: DuplicateGroup) => {
-        const keeper = record.files[0];
+        const keeper = record.keeper;
         return (
           <div className="text-sm">
-            <div className="text-emerald-600 dark:text-emerald-400 font-medium">Suggested keep:</div>
-            <div className="truncate" title={keeper.relativePath}>{keeper.relativePath}</div>
-            <div className="text-xs text-gray-500 mt-1">
-              Move duplicates → <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">_duplicates/</code>
+            <div className="text-emerald-600 dark:text-emerald-400 font-medium mb-1">Keep this copy:</div>
+            <div className="truncate font-medium" title={keeper.relativePath}>
+              {getMediaDisplayName(keeper)}
+            </div>
+            {keeper.kind === 'video' && (
+              <div className="mt-1">
+                <ResolutionBadge media={keeper} />
+              </div>
+            )}
+            <div className="text-xs text-gray-500 truncate mt-1" title={keeper.relativePath}>
+              {keeper.relativePath}
             </div>
           </div>
         );
       },
+    },
+    {
+      title: 'Actions',
+      key: 'dupActions',
+      width: 200,
+      render: (_: unknown, record: DuplicateGroup) => (
+        <Popconfirm
+          title={`Move ${record.files.length - 1} lower-quality copy/copies to ${DELETED_FOLDER}/?`}
+          description="Files stay on disk until you delete them from that folder."
+          onConfirm={() => handleMoveDuplicateCopies(record)}
+          okText="Move"
+        >
+          <Button
+            danger
+            size="small"
+            loading={movingGroupId === record.fingerprint}
+            disabled={!directoryHandle || record.files.length < 2}
+          >
+            Move duplicates
+          </Button>
+        </Popconfirm>
+      ),
     },
   ];
 
@@ -458,36 +529,6 @@ export default function MediaDashboard() {
           </div>
         </div>
       </div>
-
-      <Alert
-        type="info"
-        showIcon
-        className="mb-10 border-violet-200 dark:border-violet-900/50"
-        message="Browser permissions required"
-        description={
-          <ul className="list-disc pl-5 mb-0 space-y-1 text-sm">
-            <li>
-              When you click <strong>Pick media folder</strong>, your browser will ask permission to read that folder.
-              This app never uploads your files — scanning and playback happen entirely on your device.
-            </li>
-            <li>
-              Works best in <strong>Chrome</strong> or <strong>Edge</strong> on desktop (File System Access API). Safari/Firefox
-              may not support folder picking.
-            </li>
-            <li>
-              Your library uses <strong>Dexie</strong> (IndexedDB with separate tables for scans, files, and playlists) — each file is saved
-              as it is analyzed, so refresh is safe. After refresh, use <strong>Reconnect folder</strong> then <strong>Resume analysis</strong>.
-            </li>
-            <li>
-              Metadata is read one file at a time with an 8s timeout per file so unsupported codecs (e.g. some MKV/AVI) cannot freeze the app.
-              Duplicate detection only deep-hashes files that share the same byte size.
-            </li>
-            <li>
-              Path suggestions are recommendations only — the app does not move files on disk unless you do that yourself in Finder/Explorer.
-            </li>
-          </ul>
-        }
-      />
 
       {!isDirectoryPickerSupported() && (
         <Alert
@@ -554,14 +595,16 @@ export default function MediaDashboard() {
         >
           Resume analysis
         </Button>
-        <Button
-          size="large"
-          icon={<PlusOutlined />}
-          onClick={() => openCreatePlaylist(selectedForPlaylist)}
-          disabled={!scan}
-        >
-          Create playlist ({selectedForPlaylist.length})
-        </Button>
+        <Link to="/media/browse">
+          <Button size="large" type="primary" className="bg-violet-600" disabled={!scan}>
+            Browse videos
+          </Button>
+        </Link>
+        <Link to="/media/playlists">
+          <Button size="large" icon={<UnorderedListOutlined />} disabled={!scan}>
+            Playlists
+          </Button>
+        </Link>
         <Popconfirm title="Clear indexed library?" onConfirm={handleClearLibrary}>
           <Button size="large" danger icon={<DeleteOutlined />}>
             Clear index
@@ -640,14 +683,39 @@ export default function MediaDashboard() {
             key: 'duplicates',
             label: `Duplicates (${duplicates.length})`,
             children: (
-              <Table
-                dataSource={duplicates}
-                columns={duplicateColumns}
-                rowKey="fingerprint"
-                loading={duplicatesLoading}
-                pagination={{ pageSize: 10 }}
-                locale={{ emptyText: scan ? 'No duplicates detected.' : 'Scan a folder first.' }}
-              />
+              <div>
+                <Alert
+                  type="info"
+                  showIcon
+                  className="mb-4"
+                  message="Duplicate handling"
+                  description={
+                    <>
+                      We keep the <strong>highest resolution</strong> copy. Lower-quality duplicates can be moved to{' '}
+                      <code>{DELETED_FOLDER}/</code> on disk — delete them there when you are ready. Moving files needs
+                      write permission on your folder.
+                    </>
+                  }
+                />
+                <Space className="mb-4">
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleRefineDuplicates}
+                    loading={refiningDuplicates}
+                    disabled={!directoryHandle}
+                  >
+                    Scan for duplicates
+                  </Button>
+                </Space>
+                <Table
+                  dataSource={duplicates}
+                  columns={duplicateColumns}
+                  rowKey="fingerprint"
+                  loading={duplicatesLoading || refiningDuplicates}
+                  pagination={{ pageSize: 10 }}
+                  locale={{ emptyText: scan ? 'No duplicates detected.' : 'Scan a folder first.' }}
+                />
+              </div>
             ),
           },
           {
@@ -673,10 +741,21 @@ export default function MediaDashboard() {
             key: 'playlists',
             label: `Playlists (${playlists.length})`,
             children: (
+              <div>
+                <div className="mb-6 flex flex-wrap gap-3 items-center">
+                  <Link to="/media/playlists">
+                    <Button type="primary" icon={<UnorderedListOutlined />}>
+                      Open playlist manager
+                    </Button>
+                  </Link>
+                  <p className="text-sm text-gray-500 m-0">
+                    Create playlists and add videos on the full playlists page.
+                  </p>
+                </div>
               <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-1 space-y-2">
                   {playlists.length === 0 ? (
-                    <p className="text-gray-500">No playlists yet. Select tracks in the Library tab and click Create playlist.</p>
+                    <p className="text-gray-500">No playlists yet.</p>
                   ) : (
                     playlists.map((p) => (
                       <Button
@@ -722,6 +801,7 @@ export default function MediaDashboard() {
                   )}
                 </div>
               </div>
+              </div>
             ),
           },
         ]}
@@ -732,34 +812,33 @@ export default function MediaDashboard() {
         open={playerOpen}
         onCancel={closePlayer}
         footer={null}
-        width={800}
+        width={920}
         centered
         destroyOnClose
+        styles={{ body: { paddingTop: 12 } }}
       >
         {playerUrl && playingMedia && (
-          playingMedia.kind === 'video' ? (
-            <video src={playerUrl} controls autoPlay className="w-full max-h-[70vh] rounded-lg bg-black" />
-          ) : (
-            <audio src={playerUrl} controls autoPlay className="w-full mt-4" />
-          )
+          <MediaVideoPlayer
+            src={playerUrl}
+            title={playingMedia.name}
+            kind={playingMedia.kind}
+          />
         )}
       </Modal>
 
-      <Modal
-        title="New playlist"
-        open={playlistModalOpen}
-        onOk={handleSavePlaylist}
-        onCancel={() => setPlaylistModalOpen(false)}
-        okText="Save to browser"
-      >
-        <Input
-          placeholder="Playlist name"
-          value={newPlaylistName}
-          onChange={(e) => setNewPlaylistName(e.target.value)}
-          className="mb-3"
-        />
-        <p className="text-sm text-gray-500">{selectedForPlaylist.length} track(s) selected.</p>
-      </Modal>
+      <MediaEditMetadataModal
+        open={Boolean(editingFile)}
+        file={editingFile}
+        scanId={scan?.id}
+        facetTags={facetTags}
+        onClose={() => setEditingFile(null)}
+        onSaved={() => {
+          library.refresh();
+          if (scan?.id) {
+            MediaLibraryService.getBrowseFacets(scan.id, 'all').then((f) => setFacetTags(f.tags));
+          }
+        }}
+      />
     </div>
   );
 }
