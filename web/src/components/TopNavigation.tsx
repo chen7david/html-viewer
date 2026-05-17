@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router';
-import { FileTextOutlined, ReadOutlined, SettingOutlined, RocketOutlined, MoonOutlined, SunOutlined, LinkOutlined } from '@ant-design/icons';
+import { FileTextOutlined, ReadOutlined, SettingOutlined, RocketOutlined, MoonOutlined, SunOutlined, LinkOutlined, CustomerServiceOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
 import { useThemeMode } from '../hooks/useThemeMode';
 
@@ -25,6 +25,12 @@ export default function TopNavigation() {
       label: 'Deep Links', 
       icon: <LinkOutlined />, 
       activeClass: 'bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 shadow-sm border border-teal-200 dark:border-teal-800/50' 
+    },
+    { 
+      path: '/media', 
+      label: 'Media', 
+      icon: <CustomerServiceOutlined />, 
+      activeClass: 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400 shadow-sm border border-violet-200 dark:border-violet-800/50' 
     },
   ];
 

@@ -8,6 +8,7 @@ import Pro from './pages/Pro';
 import BooksDashboard from './pages/BooksDashboard';
 import BookViewer from './pages/BookViewer';
 import LinksDashboard from './pages/LinksDashboard';
+import MediaDashboard from './pages/MediaDashboard';
 import TopNavigation from './components/TopNavigation';
 import { ThemeProvider, useThemeMode } from './hooks/useThemeMode';
 
@@ -50,6 +51,9 @@ function ThemedApp() {
               
               {/* Links Engine Routes */}
               <Route path="/links" element={<LinksDashboard />} />
+
+              {/* Media Library Routes */}
+              <Route path="/media" element={<MediaDashboard />} />
             </Routes>
           </div>
         </BrowserRouter>
