@@ -41,6 +41,12 @@ export async function verifyDirectoryPermission(
 }
 
 export const DELETED_FOLDER = '_deleted';
+/** Default folder for user uploads (created on first upload). */
+export const UPLOADS_FOLDER = 'uploads';
+
+export function isEmptyMediaFile(file: File): boolean {
+  return file.size === 0;
+}
 
 async function walkDirectory(
   dirHandle: FileSystemDirectoryHandle,
@@ -62,13 +68,21 @@ async function walkDirectory(
 export async function collectMediaFiles(
   root: FileSystemDirectoryHandle,
   onProgress?: (found: number) => void,
-): Promise<{ file: File; relativePath: string; record: Omit<MediaFileRecord, 'duration' | 'width' | 'height' | 'fingerprint'> }[]> {
+): Promise<{
+  files: { file: File; relativePath: string; record: Omit<MediaFileRecord, 'duration' | 'width' | 'height' | 'fingerprint'> }[];
+  skippedEmpty: number;
+}> {
   const results: { file: File; relativePath: string; record: Omit<MediaFileRecord, 'duration' | 'width' | 'height' | 'fingerprint'> }[] = [];
+  let skippedEmpty = 0;
   let sinceYield = 0;
 
   await walkDirectory(root, '', async (file, relativePath) => {
     const classified = classifyMediaFile(file.name);
     if (!classified) return;
+    if (isEmptyMediaFile(file)) {
+      skippedEmpty += 1;
+      return;
+    }
 
     results.push({
       file,
@@ -93,7 +107,7 @@ export async function collectMediaFiles(
     }
   });
 
-  return results;
+  return { files: results, skippedEmpty };
 }
 
 /** Fast fingerprint without reading file bytes — used during initial index. */

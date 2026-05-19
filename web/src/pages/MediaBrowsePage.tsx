@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { Button, Spin } from 'antd';
-import { ArrowLeftOutlined, SoundOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, CloudUploadOutlined, SoundOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import MediaBrowseTab from '../components/media/MediaBrowseTab';
+import MediaUploadModal from '../components/media/MediaUploadModal';
 import { useMediaApp } from '../contexts/MediaAppContext';
 import { useMediaBrowse } from '../hooks/useMediaBrowse';
 
 export default function MediaBrowsePage() {
   const { scan, directoryHandle, isLoading, resolveFile } = useMediaApp();
   const browse = useMediaBrowse(scan?.id);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -26,6 +29,14 @@ export default function MediaBrowsePage() {
         <Link to="/media/playlists">
           <Button icon={<UnorderedListOutlined />}>Playlists</Button>
         </Link>
+        <Button
+          type="primary"
+          icon={<CloudUploadOutlined />}
+          disabled={!scan}
+          onClick={() => setUploadOpen(true)}
+        >
+          Upload
+        </Button>
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="bg-gradient-to-br from-violet-500 to-fuchsia-600 p-3 rounded-xl text-white">
             <SoundOutlined className="text-2xl" />
@@ -44,6 +55,16 @@ export default function MediaBrowsePage() {
         hasScan={Boolean(scan)}
         directoryHandle={directoryHandle}
         resolveFile={resolveFile}
+      />
+
+      <MediaUploadModal
+        open={uploadOpen}
+        facetTags={browse.facets.tags}
+        onClose={() => setUploadOpen(false)}
+        onUploaded={() => {
+          void browse.loadFacets();
+          void browse.refresh();
+        }}
       />
     </div>
   );

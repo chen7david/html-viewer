@@ -10,6 +10,14 @@ export function cacheMediaWatchSeed(video: MediaFileRecord): void {
   }
 }
 
+export function clearMediaWatchSeed(mediaId: string): void {
+  try {
+    sessionStorage.removeItem(`${SEED_PREFIX}${mediaId}`);
+  } catch {
+    // ignore
+  }
+}
+
 export function readMediaWatchSeed(mediaId: string): MediaFileRecord | undefined {
   try {
     const raw = sessionStorage.getItem(`${SEED_PREFIX}${mediaId}`);

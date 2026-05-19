@@ -81,9 +81,12 @@ export class MediaScanService {
     const onLibraryRefresh = callbacks?.onLibraryRefresh;
 
     onProgress?.('Discovering media files…');
-    const collected = await collectMediaFiles(directoryHandle, (count) => {
+    const { files: collected, skippedEmpty } = await collectMediaFiles(directoryHandle, (count) => {
       onProgress?.(`Found ${count} media file(s)…`);
     });
+    if (skippedEmpty > 0) {
+      onProgress?.(`Skipped ${skippedEmpty} empty (0 KB) file(s).`);
+    }
 
     const scanId = uuidv4();
     const rootName = directoryHandle.name;
@@ -190,6 +193,11 @@ export class MediaScanService {
 
         try {
           const file = await getFileByRelativePath(directoryHandle, target.relativePath);
+          if (file.size === 0) {
+            await MediaFileRepository.deleteById(scanId, target.id);
+            metadataSkipped += 1;
+            continue;
+          }
           const metadata = await extractMediaMetadata(file, target.kind);
           if (Object.keys(metadata).length === 0 && file.size > 0) {
             target.metadataStatus = 'skipped';

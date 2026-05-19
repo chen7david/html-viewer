@@ -17,12 +17,19 @@ import type {
 import { applyMediaTags } from '../../utils/mediaTags';
 import { clampMediaRating, isValidMediaRating } from '../../utils/mediaRating';
 import { ensureWritePermission, moveFileToDeletedFolder } from '../../utils/mediaFileOps';
+import { clearMediaWatchSeed } from '../../utils/mediaWatchSeed';
+import { MediaPlaylistService } from './MediaPlaylistService';
+import { classifyMediaFile } from '../../utils/mediaExtensions';
+import { writeUploadedMediaFile } from '../../utils/mediaFileOps';
 import {
   buildFolderProfiles,
+  computeQuickFingerprint,
+  extractMediaMetadata,
   findDuplicateGroups,
   getFileByRelativePath,
   refineDuplicateFingerprints,
 } from '../../utils/mediaScanner';
+import { v4 as uuidv4 } from 'uuid';
 
 export class MediaLibraryService {
   static async loadAppState(): Promise<{
@@ -140,6 +147,64 @@ export class MediaLibraryService {
     return updated;
   }
 
+  static async importUploadedFile(
+    scanId: string,
+    directoryHandle: FileSystemDirectoryHandle,
+    file: File,
+    options: { displayName?: string; userTags?: string[]; fileName?: string } = {},
+  ): Promise<MediaFileRecord> {
+    const uploadName = options.fileName ?? file.name;
+    const classified = classifyMediaFile(uploadName);
+    if (!classified) {
+      throw new Error('Unsupported format. Use MP4, WebM, MKV, MOV, or other common video/audio files.');
+    }
+    if (file.size === 0) {
+      throw new Error('Empty files cannot be uploaded.');
+    }
+
+    const { relativePath, fileName } = await writeUploadedMediaFile(
+      directoryHandle,
+      file,
+      uploadName,
+    );
+    const onDisk = await getFileByRelativePath(directoryHandle, relativePath);
+    const fingerprint = await computeQuickFingerprint(onDisk, relativePath);
+    const metadata = await extractMediaMetadata(onDisk, classified.kind);
+
+    const userTags = (options.userTags ?? [])
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t.length > 0);
+
+    const record = applyMediaTags({
+      id: uuidv4(),
+      relativePath,
+      name: fileName,
+      extension: classified.extension,
+      mimeType: classified.mimeType,
+      kind: classified.kind,
+      size: onDisk.size,
+      lastModified: onDisk.lastModified,
+      displayName: options.displayName?.trim() || undefined,
+      userTags: userTags.length > 0 ? userTags : undefined,
+      fingerprint,
+      metadataStatus: Object.keys(metadata).length > 0 ? 'complete' : 'skipped',
+      ...metadata,
+    });
+
+    await MediaFileRepository.upsert(scanId, record);
+
+    const meta = await MediaScanRepository.getScanMeta(scanId);
+    if (meta) {
+      await MediaScanRepository.updateScanMeta(scanId, {
+        fileCount: meta.fileCount + 1,
+        totalBytes: meta.totalBytes + record.size,
+        scannedAt: Date.now(),
+      });
+    }
+
+    return record;
+  }
+
   static async updateFileMetadata(
     scanId: string,
     mediaId: string,
@@ -163,6 +228,19 @@ export class MediaLibraryService {
     return updated;
   }
 
+  static async removeMediaFromAllPlaylists(mediaId: string): Promise<void> {
+    const playlists = await MediaPlaylistRepository.getAll();
+    await Promise.all(
+      playlists
+        .filter((p) => p.mediaIds.includes(mediaId))
+        .map((p) =>
+          MediaPlaylistService.update(p.id, {
+            mediaIds: p.mediaIds.filter((id) => id !== mediaId),
+          }),
+        ),
+    );
+  }
+
   static async moveFileToDeleted(
     scanId: string,
     directoryHandle: FileSystemDirectoryHandle,
@@ -174,6 +252,8 @@ export class MediaLibraryService {
     }
     await moveFileToDeletedFolder(directoryHandle, file.relativePath);
     await MediaFileRepository.deleteById(scanId, file.id);
+    await MediaLibraryService.removeMediaFromAllPlaylists(file.id);
+    clearMediaWatchSeed(file.id);
   }
 
   static async moveDuplicateCopiesToDeleted(

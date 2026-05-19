@@ -324,6 +324,7 @@ export default function MediaWatchPage() {
                       directoryHandle={directoryHandle}
                       resolveFile={resolveFile}
                       facetTags={facetTags}
+                      onVideoRemoved={(id) => setRelated((prev) => prev.filter((v) => v.id !== id))}
                     />
                   ))}
                 </div>

@@ -104,6 +104,10 @@ export default function MediaBrowseTab({
                   void browse.loadFacets();
                   void browse.refresh();
                 }}
+                onVideoRemoved={() => {
+                  void browse.loadFacets();
+                  void browse.refresh();
+                }}
               />
             ))}
           </div>

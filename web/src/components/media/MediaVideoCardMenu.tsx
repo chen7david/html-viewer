@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Dropdown, Input, Modal, message, type MenuProps } from 'antd';
 import {
+  DeleteOutlined,
   EditOutlined,
   EllipsisOutlined,
   InfoCircleOutlined,
@@ -9,17 +10,19 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import { useMediaApp } from '../../contexts/MediaAppContext';
-import { MediaPlaylistService } from '../../services/media';
+import { MediaLibraryService, MediaPlaylistService } from '../../services/media';
+import { DELETED_FOLDER } from '../../utils/mediaScanner';
 import type { MediaFileRecord } from '../../types/Media';
 
 interface MediaVideoCardMenuProps {
   video: MediaFileRecord;
   onEdit: () => void;
   onShowInfo: () => void;
+  onDeleted?: () => void;
 }
 
-export default function MediaVideoCardMenu({ video, onEdit, onShowInfo }: MediaVideoCardMenuProps) {
-  const { playlists, reload } = useMediaApp();
+export default function MediaVideoCardMenu({ video, onEdit, onShowInfo, onDeleted }: MediaVideoCardMenuProps) {
+  const { scan, directoryHandle, playlists, reload } = useMediaApp();
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,6 +39,39 @@ export default function MediaVideoCardMenu({ video, onEdit, onShowInfo }: MediaV
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleDelete = () => {
+    if (!scan?.id || !directoryHandle) {
+      message.info('Reconnect your media folder first.');
+      return;
+    }
+    Modal.confirm({
+      title: 'Move video to deleted folder?',
+      content: (
+        <>
+          <strong>{video.displayName ?? video.name}</strong> will be moved to{' '}
+          <code>{DELETED_FOLDER}/</code> on disk. Delete it there when you are ready to remove it permanently.
+        </>
+      ),
+      okText: 'Move to deleted',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        setBusy(true);
+        try {
+          await MediaLibraryService.moveFileToDeleted(scan.id, directoryHandle, video);
+          message.success(`Moved to ${DELETED_FOLDER}/.`);
+          await reload();
+          onDeleted?.();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : 'Could not move file');
+          throw err;
+        } finally {
+          setBusy(false);
+        }
+      },
+    });
   };
 
   const handleCreateAndAdd = async () => {
@@ -97,6 +133,13 @@ export default function MediaVideoCardMenu({ video, onEdit, onShowInfo }: MediaV
         },
       ],
     },
+    { type: 'divider' },
+    {
+      key: 'delete',
+      icon: <DeleteOutlined />,
+      label: 'Delete video',
+      danger: true,
+    },
   ];
 
   const onMenuClick: MenuProps['onClick'] = ({ key, domEvent }) => {
@@ -111,6 +154,10 @@ export default function MediaVideoCardMenu({ video, onEdit, onShowInfo }: MediaV
     }
     if (key === 'new-playlist') {
       setCreateOpen(true);
+      return;
+    }
+    if (key === 'delete') {
+      handleDelete();
       return;
     }
     if (key === 'manage-playlists') return;

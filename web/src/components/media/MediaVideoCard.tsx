@@ -21,6 +21,7 @@ interface MediaVideoCardProps {
   compact?: boolean;
   facetTags?: string[];
   onVideoUpdated?: (video: MediaFileRecord) => void;
+  onVideoRemoved?: (videoId: string) => void;
   showEdit?: boolean;
   openInNewTab?: boolean;
   /** Dense grid card for browse page. */
@@ -36,6 +37,7 @@ export default function MediaVideoCard({
   compact = false,
   facetTags = [],
   onVideoUpdated,
+  onVideoRemoved,
   showEdit = !compact,
   openInNewTab = false,
   variant = 'default',
@@ -162,6 +164,7 @@ export default function MediaVideoCard({
                   video={current}
                   onEdit={() => setEditOpen(true)}
                   onShowInfo={() => setInfoOpen(true)}
+                  onDeleted={() => onVideoRemoved?.(current.id)}
                 />
               </div>
             </div>
