@@ -38,6 +38,8 @@ import { formatBytes, formatDuration } from '../utils/mediaExtensions';
 import { getMediaDisplayName } from '../utils/mediaDisplayName';
 import { DELETED_FOLDER, isDirectoryPickerSupported } from '../utils/mediaScanner';
 
+type ScanBusyAction = 'pick' | 'rescan' | 'reconnect' | 'resume';
+
 export default function MediaDashboard() {
   const navigate = useNavigate();
   const {
@@ -49,8 +51,9 @@ export default function MediaDashboard() {
     isLoading,
     reload: reloadApp,
   } = useMediaApp();
-  const [isScanning, setIsScanning] = useState(false);
+  const [busyAction, setBusyAction] = useState<ScanBusyAction | null>(null);
   const [progressText, setProgressText] = useState('');
+  const isScanning = busyAction === 'pick' || busyAction === 'rescan' || busyAction === 'resume';
   const [activeTab, setActiveTab] = useState('library');
   const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([]);
   const [folderProfiles, setFolderProfiles] = useState<FolderProfile[]>([]);
@@ -139,7 +142,7 @@ export default function MediaDashboard() {
   };
 
   const handlePickFolder = async () => {
-    setIsScanning(true);
+    setBusyAction('pick');
     setProgressText('Waiting for folder selection…');
     try {
       const result = await MediaScanService.pickAndScanFolder(scanCallbacks);
@@ -151,7 +154,7 @@ export default function MediaDashboard() {
       const msg = err instanceof Error ? err.message : 'Failed to scan folder.';
       if (!msg.toLowerCase().includes('aborted')) message.error(msg);
     } finally {
-      setIsScanning(false);
+      setBusyAction(null);
       setProgressText('');
     }
   };
@@ -161,7 +164,7 @@ export default function MediaDashboard() {
       message.info('Pick a folder first.');
       return;
     }
-    setIsScanning(true);
+    setBusyAction('rescan');
     try {
       const updated = await MediaScanService.rescanSavedFolder(directoryHandle, scanCallbacks);
       setScan(updated);
@@ -169,7 +172,7 @@ export default function MediaDashboard() {
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Rescan failed.');
     } finally {
-      setIsScanning(false);
+      setBusyAction(null);
       setProgressText('');
     }
   };
@@ -183,7 +186,7 @@ export default function MediaDashboard() {
       message.warning('Indexing was interrupted. Use Rescan to rebuild the full file list.');
       return;
     }
-    setIsScanning(true);
+    setBusyAction('resume');
     try {
       const updated = await MediaScanService.resumeAnalysis(directoryHandle, scan, scanCallbacks);
       setScan(updated);
@@ -191,27 +194,28 @@ export default function MediaDashboard() {
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Could not resume analysis.');
     } finally {
-      setIsScanning(false);
+      setBusyAction(null);
       setProgressText('');
     }
   };
 
   const handleReconnect = async () => {
-    if (!directoryHandle) {
-      await handlePickFolder();
-      return;
-    }
-    setIsScanning(true);
+    setBusyAction('reconnect');
     try {
-      const updated = await MediaScanService.rescanSavedFolder(directoryHandle, scanCallbacks);
-      setScan(updated);
-      message.success('Reconnected and refreshed library.');
-    } catch {
-      message.warning('Could not access the saved folder. Pick it again.');
-      await handlePickFolder();
+      const handle = await MediaScanService.reconnectFolder(directoryHandle);
+      setDirectoryHandle(handle);
+      if (scan && handle.name !== scan.rootName) {
+        message.warning(
+          `Connected to "${handle.name}" but your index is for "${scan.rootName}". Use Rescan if you switched folders.`,
+        );
+      } else {
+        message.success('Folder access restored. Your library index was not changed.');
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not reconnect folder.';
+      if (!msg.toLowerCase().includes('aborted')) message.error(msg);
     } finally {
-      setIsScanning(false);
-      setProgressText('');
+      setBusyAction(null);
     }
   };
 
@@ -553,7 +557,7 @@ export default function MediaDashboard() {
           description={
             scan?.status === 'indexing'
               ? 'Use Rescan to rebuild the library from your folder.'
-              : 'Your indexed files are saved. Reconnect the folder if needed, then resume to analyze the rest.'
+              : 'Your indexed files are saved. Use Reconnect folder to grant access again, then resume analysis.'
           }
           action={
             scan?.status === 'indexing' ? (
@@ -575,23 +579,34 @@ export default function MediaDashboard() {
           size="large"
           icon={<FolderOpenOutlined />}
           onClick={handlePickFolder}
-          loading={isScanning}
-          disabled={!isDirectoryPickerSupported()}
+          loading={busyAction === 'pick'}
+          disabled={!isDirectoryPickerSupported() || busyAction !== null}
           className="bg-violet-600 hover:bg-violet-500 border-none shadow-lg shadow-violet-500/30"
         >
           Pick media folder
         </Button>
-        <Button size="large" icon={<ReloadOutlined />} onClick={handleRescan} loading={isScanning} disabled={!directoryHandle}>
+        <Button
+          size="large"
+          icon={<ReloadOutlined />}
+          onClick={handleRescan}
+          loading={busyAction === 'rescan'}
+          disabled={!directoryHandle || busyAction !== null}
+        >
           Rescan
         </Button>
-        <Button size="large" onClick={handleReconnect} loading={isScanning}>
+        <Button
+          size="large"
+          onClick={handleReconnect}
+          loading={busyAction === 'reconnect'}
+          disabled={busyAction !== null}
+        >
           Reconnect folder
         </Button>
         <Button
           size="large"
           onClick={handleResumeAnalysis}
-          loading={isScanning}
-          disabled={!directoryHandle || !scan || !isScanIncomplete || scan.status === 'indexing'}
+          loading={busyAction === 'resume'}
+          disabled={!directoryHandle || !scan || !isScanIncomplete || scan.status === 'indexing' || busyAction !== null}
         >
           Resume analysis
         </Button>
@@ -656,7 +671,7 @@ export default function MediaDashboard() {
                     dataSource={library.files}
                     columns={libraryColumns}
                     rowKey="id"
-                    loading={library.isLoading || isScanning}
+                    loading={library.isLoading || busyAction === 'pick' || busyAction === 'rescan'}
                     pagination={{
                       current: library.page,
                       pageSize: library.pageSize,

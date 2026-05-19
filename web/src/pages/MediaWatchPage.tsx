@@ -22,6 +22,7 @@ export default function MediaWatchPage() {
   const { mediaId } = useParams<{ mediaId: string }>();
   const [searchParams] = useSearchParams();
   const playlistId = searchParams.get('playlist');
+  const from = searchParams.get('from');
   const navigate = useNavigate();
   const { scan, directoryHandle, playlists, resolveFile } = useMediaApp();
 
@@ -164,6 +165,7 @@ export default function MediaWatchPage() {
   const extensionLine = formatMediaExtensionLine(media);
   const hasNext = inPlaylistMode && playlistIndex >= 0 && playlistIndex < playlistTracks.length - 1;
   const hasPrev = inPlaylistMode && playlistIndex > 0;
+  const browseBackTarget = from && from.startsWith('/media/browse') ? from : '/media/browse';
 
   return (
     <div className="max-w-[1280px] mx-auto p-4 md:p-6">
@@ -173,7 +175,7 @@ export default function MediaWatchPage() {
             <Button icon={<ArrowLeftOutlined />}>Playlist</Button>
           </Link>
         ) : (
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/media/browse')}>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(browseBackTarget)}>
             Browse
           </Button>
         )}

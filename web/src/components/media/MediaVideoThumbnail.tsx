@@ -5,11 +5,33 @@ import { withThumbnailSlot } from '../../utils/videoThumbnailQueue';
 
 const THUMB_CACHE = new Map<string, string>();
 const THUMB_FAIL = new Set<string>();
+const MAX_THUMB_CACHE_ITEMS = 120;
+
+function addThumbToCache(id: string, url: string) {
+  const existing = THUMB_CACHE.get(id);
+  if (existing && existing !== url) {
+    URL.revokeObjectURL(existing);
+  }
+
+  if (THUMB_CACHE.has(id)) {
+    THUMB_CACHE.delete(id);
+  }
+  THUMB_CACHE.set(id, url);
+
+  while (THUMB_CACHE.size > MAX_THUMB_CACHE_ITEMS) {
+    const oldestKey = THUMB_CACHE.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    const oldestUrl = THUMB_CACHE.get(oldestKey);
+    THUMB_CACHE.delete(oldestKey);
+    if (oldestUrl) URL.revokeObjectURL(oldestUrl);
+  }
+}
 
 interface MediaVideoThumbnailProps {
   media: MediaFileRecord;
   resolveFile: (media: MediaFileRecord) => Promise<File>;
   className?: string;
+  hoverPreview?: boolean;
 }
 
 /**
@@ -20,18 +42,13 @@ export default function MediaVideoThumbnail({
   media,
   resolveFile,
   className = '',
+  hoverPreview = false,
 }: MediaVideoThumbnailProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(() => THUMB_CACHE.get(media.id) ?? null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(() => THUMB_FAIL.has(media.id));
-
-  useEffect(() => {
-    setReady(false);
-    setFailed(THUMB_FAIL.has(media.id));
-    setBlobUrl(THUMB_CACHE.get(media.id) ?? null);
-  }, [media.id]);
 
   useEffect(() => {
     if (blobUrl || failed || THUMB_CACHE.has(media.id)) return;
@@ -61,7 +78,7 @@ export default function MediaVideoThumbnail({
           URL.revokeObjectURL(url);
           return;
         }
-        THUMB_CACHE.set(media.id, url);
+        addThumbToCache(media.id, url);
         setBlobUrl(url);
       } catch {
         if (!cancelled) {
@@ -86,24 +103,47 @@ export default function MediaVideoThumbnail({
       const seekTo = Number.isFinite(video.duration) && video.duration > 1 ? Math.min(2, video.duration * 0.05) : 0.5;
       video.currentTime = seekTo;
     };
+    const onError = () => {
+      THUMB_FAIL.add(media.id);
+      setFailed(true);
+    };
 
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('seeked', onSeeked);
-    video.addEventListener('error', () => {
-      THUMB_FAIL.add(media.id);
-      setFailed(true);
-    });
+    video.addEventListener('error', onError);
 
     return () => {
       video.removeEventListener('loadedmetadata', onLoadedMetadata);
       video.removeEventListener('seeked', onSeeked);
+      video.removeEventListener('error', onError);
     };
   }, [blobUrl, media.id]);
+
+  const handleMouseEnter = () => {
+    if (!hoverPreview) return;
+    const video = videoRef.current;
+    if (!video || !ready || failed) return;
+    video.muted = true;
+    void video.play().catch(() => {
+      // Ignore autoplay restrictions and keep static thumbnail fallback.
+    });
+  };
+
+  const handleMouseLeave = () => {
+    if (!hoverPreview) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.pause();
+    const seekTo = Number.isFinite(video.duration) && video.duration > 1 ? Math.min(2, video.duration * 0.05) : 0.5;
+    video.currentTime = seekTo;
+  };
 
   return (
     <div
       ref={rootRef}
       className={`relative overflow-hidden bg-gray-900 flex items-center justify-center ${className}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {!failed && blobUrl ? (
         <video

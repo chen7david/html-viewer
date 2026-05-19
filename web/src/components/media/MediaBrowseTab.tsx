@@ -95,6 +95,7 @@ export default function MediaBrowseTab({
               <MediaVideoCard
                 key={video.id}
                 showEdit
+                openInNewTab
                 video={video}
                 directoryHandle={directoryHandle}
                 resolveFile={resolveFile}
@@ -115,8 +116,11 @@ export default function MediaBrowseTab({
               pageSizeOptions={[20, 40, 60, 100]}
               showTotal={(total) => `${total} videos`}
               onChange={(p, size) => {
+                if (size !== browse.pageSize) {
+                  browse.setPageSize(size);
+                  return;
+                }
                 browse.setPage(p);
-                if (size !== browse.pageSize) browse.setPageSize(size);
               }}
             />
           </div>

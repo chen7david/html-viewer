@@ -33,6 +33,22 @@ export class MediaScanService {
     return { scan, directoryHandle };
   }
 
+  /** Restore read access to the saved folder without re-indexing the library. */
+  static async reconnectFolder(
+    handle?: FileSystemDirectoryHandle | null,
+  ): Promise<FileSystemDirectoryHandle> {
+    let directoryHandle = handle ?? (await MediaScanRepository.getDirectoryHandle());
+    if (!directoryHandle) {
+      directoryHandle = await pickMediaDirectory();
+      await MediaScanRepository.saveDirectoryHandle(directoryHandle);
+    }
+    const granted = await verifyDirectoryPermission(directoryHandle, 'read');
+    if (!granted) {
+      throw new Error('Folder read permission was denied.');
+    }
+    return directoryHandle;
+  }
+
   static async rescanSavedFolder(
     directoryHandle: FileSystemDirectoryHandle,
     callbacks?: MediaScanCallbacks,

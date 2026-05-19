@@ -1,7 +1,7 @@
 import { EditOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { Button, Tooltip } from 'antd';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import type { MediaFileRecord } from '../../types/Media';
 import { useMediaApp } from '../../contexts/MediaAppContext';
 import { formatDuration } from '../../utils/mediaExtensions';
@@ -20,6 +20,8 @@ interface MediaVideoCardProps {
   onVideoUpdated?: (video: MediaFileRecord) => void;
   /** Show edit control on the card (browse page) */
   showEdit?: boolean;
+  /** Open watch page in a new tab when card is clicked. */
+  openInNewTab?: boolean;
 }
 
 const TITLE_TOOLTIP = (displayName: string, fileName: string, path: string) => (
@@ -38,8 +40,10 @@ export default function MediaVideoCard({
   facetTags = [],
   onVideoUpdated,
   showEdit = !compact,
+  openInNewTab = false,
 }: MediaVideoCardProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { scan } = useMediaApp();
   const [editOpen, setEditOpen] = useState(false);
   const [current, setCurrent] = useState(video);
@@ -53,7 +57,14 @@ export default function MediaVideoCard({
   const userTags = current.userTags ?? [];
   const tooltipContent = TITLE_TOOLTIP(displayName, current.name, current.relativePath);
 
-  const openWatch = () => navigate(`/media/watch/${current.id}`);
+  const watchUrl = `/media/watch/${current.id}?from=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
+  const openWatch = () => {
+    if (openInNewTab) {
+      window.open(watchUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    navigate(watchUrl);
+  };
 
   const handleSaved = (updated: MediaFileRecord) => {
     setCurrent(updated);
@@ -65,6 +76,11 @@ export default function MediaVideoCard({
       <article
         className="group cursor-pointer h-full flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden hover:border-violet-400 dark:hover:border-violet-500 hover:shadow-lg hover:shadow-violet-500/10 transition-all"
         onClick={openWatch}
+        onAuxClick={(e) => {
+          if (e.button === 1) {
+            window.open(watchUrl, '_blank', 'noopener,noreferrer');
+          }
+        }}
         onKeyDown={(e) => e.key === 'Enter' && openWatch()}
         role="button"
         tabIndex={0}
@@ -74,6 +90,7 @@ export default function MediaVideoCard({
             <MediaVideoThumbnail
               media={current}
               resolveFile={resolveFile}
+              hoverPreview={!compact}
               className="w-full h-full"
             />
           ) : (
