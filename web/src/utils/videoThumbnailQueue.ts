@@ -1,5 +1,5 @@
 /** Limits concurrent local-file thumbnail decodes so the UI stays smooth. */
-const MAX_CONCURRENT = 3;
+const MAX_CONCURRENT = 2;
 let active = 0;
 const waitQueue: Array<() => void> = [];
 

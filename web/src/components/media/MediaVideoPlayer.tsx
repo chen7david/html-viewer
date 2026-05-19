@@ -1,15 +1,10 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
-import { MediaCommunitySkin, MediaOutlet, MediaPlayer } from '@vidstack/react';
-import 'vidstack/styles/base.css';
-import 'vidstack/styles/defaults.css';
-import 'vidstack/styles/community-skin/video.css';
-import 'vidstack/styles/community-skin/audio.css';
 
 interface MediaVideoPlayerProps {
   src: string;
+  mimeType?: string;
   title: string;
   kind: 'video' | 'audio';
-  /** YouTube-style constrained 16:9 player on watch page */
   layout?: 'watch' | 'default';
   className?: string;
   onEnded?: () => void;
@@ -24,16 +19,24 @@ export default function MediaVideoPlayer({
   onEnded,
 }: MediaVideoPlayerProps) {
   const isWatch = layout === 'watch' && kind === 'video';
-  const shellRef = useRef<HTMLDivElement>(null);
+  const mediaRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    if (!onEnded) return;
-    const video = shellRef.current?.querySelector('video');
-    if (!video) return;
+    const el = mediaRef.current;
+    if (!el || !onEnded) return;
     const handleEnded = () => onEnded();
-    video.addEventListener('ended', handleEnded);
-    return () => video.removeEventListener('ended', handleEnded);
+    el.addEventListener('ended', handleEnded);
+    return () => el.removeEventListener('ended', handleEnded);
   }, [src, onEnded]);
+
+  useEffect(() => {
+    const el = mediaRef.current;
+    if (!el) return;
+    el.load();
+    void el.play().catch(() => {
+      // Autoplay may be blocked; native controls remain available.
+    });
+  }, [src]);
 
   return (
     <div className={className}>
@@ -41,9 +44,8 @@ export default function MediaVideoPlayer({
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 truncate font-medium">{title}</p>
       )}
       <div
-        ref={shellRef}
-        className={`media-player-shell flex items-center justify-center bg-black overflow-hidden ${
-          isWatch ? 'w-full aspect-video rounded-xl max-w-4xl mx-auto' : 'w-full rounded-lg'
+        className={`media-player-shell overflow-hidden bg-black ${
+          isWatch ? 'media-player-watch aspect-video rounded-xl' : 'w-full rounded-lg'
         }`}
         style={
           isWatch
@@ -54,17 +56,29 @@ export default function MediaVideoPlayer({
               } as CSSProperties)
         }
       >
-        <MediaPlayer
-          src={src}
-          title={title}
-          autoplay
-          playsInline
-          className="media-player-contain w-full h-full"
-          style={{ '--media-brand': '#7c3aed' } as CSSProperties}
-        >
-          <MediaOutlet />
-          <MediaCommunitySkin />
-        </MediaPlayer>
+        {kind === 'video' ? (
+          <video
+            key={src}
+            ref={mediaRef}
+            src={src}
+            controls
+            controlsList="nodownload"
+            playsInline
+            preload="auto"
+            className="w-full h-full min-h-[200px] object-contain bg-black"
+            title={title}
+          />
+        ) : (
+          <audio
+            key={src}
+            src={src}
+            controls
+            preload="auto"
+            className="w-full m-4"
+            title={title}
+            onEnded={onEnded}
+          />
+        )}
       </div>
     </div>
   );

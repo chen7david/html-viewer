@@ -83,6 +83,13 @@ export class MediaFileRepository {
     return rows.map(stripScanId);
   }
 
+  /** Lookup by primary key — file ids are globally unique (not scoped to scan query). */
+  static async getById(mediaId: string): Promise<MediaFileRecord | undefined> {
+    await MediaFileRepository.ready();
+    const row = await mediaDb.mediaFiles.get(mediaId);
+    return row ? normalizeFile(stripScanId(row)) : undefined;
+  }
+
   static async getByIds(scanId: string, ids: string[]): Promise<MediaFileRecord[]> {
     if (ids.length === 0) return [];
     await MediaFileRepository.ready();

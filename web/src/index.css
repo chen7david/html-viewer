@@ -28,7 +28,20 @@ body {
   }
 }
 
-/* Keep full video in view — especially portrait / mobile recordings */
+/* Inline player: letterbox inside the watch-page 16:9 shell */
+.media-player-watch {
+  width: 100%;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.media-player-contain,
+.media-player-contain [data-media-player] {
+  width: 100%;
+  height: 100%;
+}
+
 .media-player-contain [data-media-player] video,
 .media-player-contain video {
   object-fit: contain !important;
@@ -37,6 +50,46 @@ body {
   max-height: min(75dvh, calc(100dvh - 14rem));
 }
 
-.media-player-shell {
-  width: 100%;
+/* Fullscreen: fill the screen (no fixed 16:9 box with empty band below) */
+.media-player-shell:fullscreen,
+.media-player-shell:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  aspect-ratio: unset !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.media-player-shell:fullscreen .media-player-contain,
+.media-player-shell:fullscreen .media-player-contain [data-media-player],
+.media-player-shell:-webkit-full-screen .media-player-contain,
+.media-player-shell:-webkit-full-screen .media-player-contain [data-media-player] {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+}
+
+.media-player-shell:fullscreen .media-player-contain video,
+.media-player-shell:-webkit-full-screen .media-player-contain video {
+  max-height: 100vh !important;
+  max-width: 100vw !important;
+}
+
+media-player[data-fullscreen],
+[data-media-player][data-fullscreen] {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+media-player[data-fullscreen] video,
+[data-media-player][data-fullscreen] video {
+  max-height: 100vh !important;
+  max-width: 100vw !important;
+  object-fit: contain !important;
 }

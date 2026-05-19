@@ -90,11 +90,11 @@ export default function MediaBrowseTab({
             Showing {(browse.page - 1) * browse.pageSize + 1}–
             {Math.min(browse.page * browse.pageSize, browse.total)} of {browse.total} videos
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-stretch">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-2 gap-y-4">
             {browse.videos.map((video) => (
               <MediaVideoCard
                 key={video.id}
-                showEdit
+                variant="browse"
                 openInNewTab
                 video={video}
                 directoryHandle={directoryHandle}

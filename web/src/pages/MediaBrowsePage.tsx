@@ -33,7 +33,7 @@ export default function MediaBrowsePage() {
           <div>
             <h1 className="text-2xl md:text-3xl font-bold m-0">Browse videos</h1>
             <p className="text-gray-500 dark:text-gray-400 m-0 text-sm">
-              Click a thumbnail to open watch in a new tab
+              Hover thumbnails to scrub · click to watch in a new tab
             </p>
           </div>
         </div>

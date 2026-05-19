@@ -46,9 +46,14 @@ export class MediaLibraryService {
     return MediaFileRepository.getBrowseFacets(scanId, kind);
   }
 
-  static async getVideoById(scanId: string, mediaId: string): Promise<MediaFileRecord | undefined> {
-    const files = await MediaFileRepository.getByIds(scanId, [mediaId]);
-    return files[0];
+  static async getFileById(mediaId: string): Promise<MediaFileRecord | undefined> {
+    return MediaFileRepository.getById(mediaId);
+  }
+
+  static async getVideoById(_scanId: string, mediaId: string): Promise<MediaFileRecord | undefined> {
+    const file = await MediaFileRepository.getById(mediaId);
+    if (!file || file.kind !== 'video') return undefined;
+    return file;
   }
 
   static async getAllVideos(scanId: string): Promise<MediaFileRecord[]> {

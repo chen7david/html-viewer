@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, Button, Space, Spin, Tag } from 'antd';
 import { ArrowLeftOutlined, EditOutlined, StepBackwardOutlined, StepForwardOutlined } from '@ant-design/icons';
 import MediaEditMetadataModal from '../components/media/MediaEditMetadataModal';
@@ -17,6 +17,7 @@ import {
   getMediaDisplayName,
 } from '../utils/mediaDisplayName';
 import { getRelatedVideos } from '../utils/mediaRelated';
+import { readMediaWatchSeed } from '../utils/mediaWatchSeed';
 
 export default function MediaWatchPage() {
   const { mediaId } = useParams<{ mediaId: string }>();
@@ -24,17 +25,19 @@ export default function MediaWatchPage() {
   const playlistId = searchParams.get('playlist');
   const from = searchParams.get('from');
   const navigate = useNavigate();
-  const { scan, directoryHandle, playlists, resolveFile } = useMediaApp();
+  const location = useLocation();
+  const { scan, directoryHandle, playlists, resolveFile, isLoading: appLoading } = useMediaApp();
 
   const [media, setMedia] = useState<MediaFileRecord | null>(null);
   const [related, setRelated] = useState<MediaFileRecord[]>([]);
   const [playlistTracks, setPlaylistTracks] = useState<MediaFileRecord[]>([]);
   const [facetTags, setFacetTags] = useState<string[]>([]);
   const [playerUrl, setPlayerUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [playerLoading, setPlayerLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  const urlRef = useRef<string | null>(null);
+  const playerUrlRef = useRef<string | null>(null);
+  const loadGenerationRef = useRef(0);
 
   const playlist = useMemo(
     () => (playlistId ? playlists.find((p) => p.id === playlistId) : undefined),
@@ -68,7 +71,10 @@ export default function MediaWatchPage() {
 
   useEffect(() => {
     return () => {
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      if (playerUrlRef.current) {
+        URL.revokeObjectURL(playerUrlRef.current);
+        playerUrlRef.current = null;
+      }
     };
   }, []);
 
@@ -80,60 +86,108 @@ export default function MediaWatchPage() {
     MediaLibraryService.getPlaylistTracks(scan.id, playlist.mediaIds).then(setPlaylistTracks);
   }, [scan?.id, playlistId, playlist]);
 
+  // Load player when video id or folder access changes. Generation guard avoids stale async updates.
   useEffect(() => {
-    if (!scan?.id || !mediaId) {
-      setIsLoading(false);
+    if (appLoading) return;
+
+    if (!mediaId) {
+      setPlayerLoading(false);
+      setMedia(null);
+      setPlayerUrl(null);
+      setError('Missing video id.');
       return;
     }
 
-    let cancelled = false;
+    const generation = ++loadGenerationRef.current;
+    const isCurrent = () => generation === loadGenerationRef.current;
 
-    async function load() {
-      setIsLoading(true);
+    const navState = location.state as { video?: MediaFileRecord } | null;
+    const seedVideo =
+      navState?.video?.id === mediaId ? navState.video : readMediaWatchSeed(mediaId);
+
+    async function loadPlayer() {
+      setPlayerLoading(true);
       setError(null);
+
       try {
-        const record = await MediaLibraryService.getVideoById(scan!.id, mediaId!);
+        let record =
+          seedVideo ?? (await MediaLibraryService.getFileById(mediaId!));
+        if (!record && scan?.id) {
+          record = await MediaLibraryService.getVideoById(scan.id, mediaId!);
+        }
+        if (!isCurrent()) return;
+
         if (!record) {
+          setMedia(null);
+          setPlayerUrl(null);
           setError('Video not found in your library.');
           return;
         }
+
         if (!directoryHandle) {
           setMedia(record);
+          setPlayerUrl(null);
           setError('Reconnect your folder from the Media hub to play this file.');
           return;
         }
 
         const file = await resolveFile(record);
-        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-        const url = URL.createObjectURL(file);
-        urlRef.current = url;
-        setPlayerUrl(url);
-        setMedia(record);
+        if (!isCurrent()) return;
 
-        const [allVideos, facets] = await Promise.all([
-          MediaLibraryService.getAllVideos(scan!.id),
-          MediaLibraryService.getBrowseFacets(scan!.id, 'video'),
-        ]);
-        if (!cancelled) {
-          if (!playlistId) {
-            setRelated(getRelatedVideos(record, allVideos, 12));
-          } else {
-            setRelated([]);
-          }
-          setFacetTags(facets.tags);
+        const url = URL.createObjectURL(file);
+        if (!isCurrent()) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        const previous = playerUrlRef.current;
+        playerUrlRef.current = url;
+        setMedia(record);
+        setPlayerUrl(url);
+        if (previous && previous !== url) {
+          URL.revokeObjectURL(previous);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not load video.');
+        if (isCurrent()) {
+          setError(err instanceof Error ? err.message : 'Could not load video.');
+          setPlayerUrl(null);
+        }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (isCurrent()) setPlayerLoading(false);
       }
     }
 
-    load();
+    void loadPlayer();
+    // resolveFile identity is stable enough via directoryHandle
+  }, [appLoading, scan?.id, mediaId, directoryHandle, location.state]);
+
+  // Related videos + facets (does not touch the player blob URL).
+  useEffect(() => {
+    if (!scan?.id || !mediaId || !media) return;
+
+    let cancelled = false;
+
+    async function loadRelated() {
+      const scanId = scan!.id;
+      if (!media) return;
+      const [allVideos, facets] = await Promise.all([
+        MediaLibraryService.getAllVideos(scanId),
+        MediaLibraryService.getBrowseFacets(scanId, 'video'),
+      ]);
+      if (cancelled) return;
+      if (!playlistId) {
+        setRelated(getRelatedVideos(media, allVideos, 12));
+      } else {
+        setRelated([]);
+      }
+      setFacetTags(facets.tags);
+    }
+
+    void loadRelated();
     return () => {
       cancelled = true;
     };
-  }, [scan?.id, mediaId, directoryHandle, resolveFile, playlistId]);
+  }, [scan?.id, mediaId, media, playlistId]);
 
   const handlePlaylistRating = async (video: MediaFileRecord, rating: number | undefined) => {
     if (!scan?.id) return;
@@ -142,7 +196,7 @@ export default function MediaWatchPage() {
     if (video.id === mediaId) setMedia(updated);
   };
 
-  if (isLoading) {
+  if (appLoading || (playerLoading && !media && !playerUrl)) {
     return (
       <div className="flex justify-center items-center min-h-[50vh]">
         <Spin size="large" />
@@ -197,16 +251,28 @@ export default function MediaWatchPage() {
 
       <div className="grid xl:grid-cols-[1fr_380px] gap-6">
         <div>
-          {playerUrl && (
-            <MediaVideoPlayer
-              src={playerUrl}
-              title={displayName}
-              kind={media.kind}
-              layout="watch"
-              className="mb-3"
-              onEnded={inPlaylistMode && hasNext ? playNext : undefined}
-            />
-          )}
+          <div className="relative mb-3 max-w-4xl mx-auto">
+            {playerLoading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/70 aspect-video">
+                <Spin size="large" />
+              </div>
+            )}
+            {playerUrl ? (
+              <MediaVideoPlayer
+                key={`${media.id}-${playerUrl}`}
+                src={playerUrl}
+                mimeType={media.mimeType}
+                title={displayName}
+                kind={media.kind}
+                layout="watch"
+                onEnded={inPlaylistMode && hasNext ? playNext : undefined}
+              />
+            ) : (
+              <div className="aspect-video rounded-xl bg-black flex items-center justify-center text-gray-400 text-sm px-4 text-center">
+                {error ?? 'Video unavailable'}
+              </div>
+            )}
+          </div>
 
           <header className="mb-6 max-w-4xl">
             <div className="flex flex-wrap items-start gap-2 justify-between">
@@ -249,14 +315,14 @@ export default function MediaWatchPage() {
               {related.length === 0 ? (
                 <p className="text-gray-500 text-sm">No related videos found in this folder.</p>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-2 gap-y-4">
                   {related.map((video) => (
                     <MediaVideoCard
                       key={video.id}
+                      variant="browse"
                       video={video}
                       directoryHandle={directoryHandle}
                       resolveFile={resolveFile}
-                      compact
                       facetTags={facetTags}
                     />
                   ))}

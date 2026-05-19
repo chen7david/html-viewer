@@ -1,14 +1,17 @@
-import { EditOutlined, PlayCircleOutlined } from '@ant-design/icons';
-import { Button, Tooltip } from 'antd';
-import { useEffect, useState } from 'react';
+import { InfoCircleOutlined } from '@ant-design/icons';
+import { Tooltip } from 'antd';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import type { MediaFileRecord } from '../../types/Media';
 import { useMediaApp } from '../../contexts/MediaAppContext';
 import { formatDuration } from '../../utils/mediaExtensions';
-import { formatMediaExtensionLine, getMediaDisplayName } from '../../utils/mediaDisplayName';
+import { getMediaDisplayName } from '../../utils/mediaDisplayName';
+import { cacheMediaWatchSeed } from '../../utils/mediaWatchSeed';
+import { formatResolutionDisplay } from '../../utils/videoResolution';
 import MediaEditMetadataModal from './MediaEditMetadataModal';
 import MediaVideoActions from './MediaVideoActions';
-import ResolutionBadge from './ResolutionBadge';
+import MediaVideoCardMenu from './MediaVideoCardMenu';
+import MediaVideoDetailsModal from './MediaVideoDetailsModal';
 import MediaVideoThumbnail from './MediaVideoThumbnail';
 
 interface MediaVideoCardProps {
@@ -18,19 +21,13 @@ interface MediaVideoCardProps {
   compact?: boolean;
   facetTags?: string[];
   onVideoUpdated?: (video: MediaFileRecord) => void;
-  /** Show edit control on the card (browse page) */
   showEdit?: boolean;
-  /** Open watch page in a new tab when card is clicked. */
   openInNewTab?: boolean;
+  /** Dense grid card for browse page. */
+  variant?: 'default' | 'browse';
 }
 
-const TITLE_TOOLTIP = (displayName: string, fileName: string, path: string) => (
-  <div className="max-w-xs">
-    <div className="font-medium">{displayName}</div>
-    <div className="text-xs opacity-80 mt-1 font-mono">{fileName}</div>
-    <div className="text-xs opacity-70 mt-0.5 truncate">{path}</div>
-  </div>
-);
+const CLICK_MOVE_THRESHOLD_PX = 6;
 
 export default function MediaVideoCard({
   video,
@@ -41,29 +38,39 @@ export default function MediaVideoCard({
   onVideoUpdated,
   showEdit = !compact,
   openInNewTab = false,
+  variant = 'default',
 }: MediaVideoCardProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { scan } = useMediaApp();
   const [editOpen, setEditOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [current, setCurrent] = useState(video);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didScrubRef = useRef(false);
+
+  const isBrowse = variant === 'browse';
 
   useEffect(() => {
     setCurrent(video);
   }, [video]);
 
   const displayName = getMediaDisplayName(current);
-  const extensionLine = formatMediaExtensionLine(current);
-  const userTags = current.userTags ?? [];
-  const tooltipContent = TITLE_TOOLTIP(displayName, current.name, current.relativePath);
+  const resolutionLabel = formatResolutionDisplay(current);
 
   const watchUrl = `/media/watch/${current.id}?from=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
+
   const openWatch = () => {
+    cacheMediaWatchSeed(current);
     if (openInNewTab) {
       window.open(watchUrl, '_blank', 'noopener,noreferrer');
       return;
     }
-    navigate(watchUrl);
+    if (location.pathname.startsWith('/media/watch/')) {
+      navigate(watchUrl, { replace: true, state: { video: current } });
+      return;
+    }
+    navigate(watchUrl, { state: { video: current } });
   };
 
   const handleSaved = (updated: MediaFileRecord) => {
@@ -71,15 +78,145 @@ export default function MediaVideoCard({
     onVideoUpdated?.(updated);
   };
 
+  const handleCardClick = () => {
+    if (didScrubRef.current) {
+      didScrubRef.current = false;
+      return;
+    }
+    openWatch();
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    didScrubRef.current = false;
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+    if (!start || !isBrowse) return;
+    const moved =
+      Math.abs(e.clientX - start.x) > CLICK_MOVE_THRESHOLD_PX ||
+      Math.abs(e.clientY - start.y) > CLICK_MOVE_THRESHOLD_PX;
+    if (moved) didScrubRef.current = true;
+  };
+
+  if (isBrowse) {
+    return (
+      <>
+        <article
+          className="group flex flex-col gap-1.5"
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+        >
+          <div
+            className="relative aspect-video rounded-md overflow-hidden bg-zinc-900 cursor-pointer ring-1 ring-black/10 dark:ring-white/10 group-hover:ring-orange-500/60 transition-shadow"
+            onClick={handleCardClick}
+            onAuxClick={(e) => {
+              if (e.button === 1) window.open(watchUrl, '_blank', 'noopener,noreferrer');
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && openWatch()}
+          >
+            {directoryHandle ? (
+              <MediaVideoThumbnail
+                media={current}
+                resolveFile={resolveFile}
+                scrubPreview
+                className="w-full h-full"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500 px-2 text-center">
+                Reconnect folder
+              </div>
+            )}
+
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
+
+            {resolutionLabel !== '—' && (
+              <span className="absolute top-1.5 left-1.5 z-20 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-black/70 text-white pointer-events-none">
+                {resolutionLabel}
+              </span>
+            )}
+            <span className="absolute bottom-8 right-1.5 z-20 px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums bg-black/70 text-white pointer-events-none">
+              {formatDuration(current.duration)}
+            </span>
+
+            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 z-30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto">
+              <Tooltip title="Video details">
+                <button
+                  type="button"
+                  className="flex items-center justify-center w-7 h-7 rounded-full bg-black/55 text-white hover:bg-black/75"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInfoOpen(true);
+                  }}
+                  aria-label="Video details"
+                >
+                  <InfoCircleOutlined className="text-sm" />
+                </button>
+              </Tooltip>
+              <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                <MediaVideoCardMenu
+                  video={current}
+                  onEdit={() => setEditOpen(true)}
+                  onShowInfo={() => setInfoOpen(true)}
+                />
+              </div>
+            </div>
+
+          </div>
+
+          <div className="min-w-0 px-0.5">
+            <h3
+              className="text-xs font-medium text-gray-900 dark:text-gray-100 m-0 line-clamp-2 leading-snug cursor-pointer hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
+              title={displayName}
+              onClick={(e) => {
+                e.stopPropagation();
+                openWatch();
+              }}
+            >
+              {displayName}
+            </h3>
+            <div
+              className="mt-1"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <MediaVideoActions
+                video={current}
+                compact
+                starSize="small"
+                onUpdated={(updated) => {
+                  setCurrent(updated);
+                  onVideoUpdated?.(updated);
+                }}
+              />
+            </div>
+          </div>
+        </article>
+
+        <MediaEditMetadataModal
+          open={editOpen}
+          file={current}
+          scanId={scan?.id}
+          facetTags={facetTags}
+          onClose={() => setEditOpen(false)}
+          onSaved={handleSaved}
+        />
+        <MediaVideoDetailsModal open={infoOpen} video={current} onClose={() => setInfoOpen(false)} />
+      </>
+    );
+  }
+
   return (
     <>
       <article
         className="group cursor-pointer h-full flex flex-col rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden hover:border-violet-400 dark:hover:border-violet-500 hover:shadow-lg hover:shadow-violet-500/10 transition-all"
         onClick={openWatch}
         onAuxClick={(e) => {
-          if (e.button === 1) {
-            window.open(watchUrl, '_blank', 'noopener,noreferrer');
-          }
+          if (e.button === 1) window.open(watchUrl, '_blank', 'noopener,noreferrer');
         }}
         onKeyDown={(e) => e.key === 'Enter' && openWatch()}
         role="button"
@@ -98,119 +235,41 @@ export default function MediaVideoCard({
               Reconnect folder
             </div>
           )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 transition-colors flex items-center justify-center pointer-events-none">
-            <PlayCircleOutlined className="text-5xl text-white opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100 transition-all drop-shadow-lg" />
-          </div>
-          <div className="absolute top-2 right-2 z-20 pointer-events-none">
-            <ResolutionBadge media={current} />
-          </div>
-          <div className="absolute bottom-2 right-2 z-20 px-1.5 py-0.5 rounded bg-black/75 text-[10px] text-white font-medium tabular-nums pointer-events-none">
-            {formatDuration(current.duration)}
-          </div>
-          {showEdit && (
-            <Tooltip title="Edit name & tags">
-              <Button
-                type="default"
-                size="small"
-                icon={<EditOutlined />}
-                className="absolute top-2 left-2 z-20 shadow-sm bg-white/95 dark:bg-gray-800/95"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditOpen(true);
-                }}
-                aria-label="Edit metadata"
-              />
-            </Tooltip>
-          )}
         </div>
 
         <div className={`flex flex-col flex-1 min-h-0 ${compact ? 'p-2 gap-1' : 'p-3 gap-1.5'}`}>
-          <Tooltip title={tooltipContent} placement="topLeft" mouseEnterDelay={0.4}>
-            <h3
-              className={`font-semibold text-gray-900 dark:text-gray-100 m-0 overflow-hidden ${
-                compact
-                  ? 'text-xs line-clamp-2 leading-4 min-h-[2rem] max-h-[2rem]'
-                  : 'text-sm line-clamp-2 leading-5 min-h-[2.5rem] max-h-[2.5rem]'
-              }`}
-            >
-              {displayName}
-            </h3>
-          </Tooltip>
-
-          {!compact && (
-            <>
-              <p
-                className="text-[11px] text-gray-400 font-mono h-4 leading-4 truncate m-0 shrink-0"
-                title={extensionLine ? `${extensionLine} · ${current.name}` : current.name}
-              >
-                {extensionLine || '\u00A0'}
-              </p>
-
-              <div className="h-5 shrink-0 overflow-hidden flex items-center gap-1 flex-nowrap">
-                {userTags.length > 0 ? (
-                  <>
-                    {userTags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 truncate max-w-[72px] shrink-0"
-                        title={tag}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                    {userTags.length > 3 && (
-                      <span className="text-[10px] text-gray-400 shrink-0">+{userTags.length - 3}</span>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-[10px] text-transparent select-none" aria-hidden>
-                    —
-                  </span>
-                )}
-              </div>
-
-              <div className="h-8 shrink-0 flex items-center">
-                <MediaVideoActions
-                  video={current}
-                  compact={false}
-                  onUpdated={(updated) => {
-                    setCurrent(updated);
-                    onVideoUpdated?.(updated);
-                  }}
-                />
-              </div>
-
-              <Tooltip title={current.relativePath} placement="bottom">
-                <p className="text-[11px] text-gray-400 truncate h-4 leading-4 m-0 mt-auto shrink-0">
-                  {current.relativePath}
-                </p>
-              </Tooltip>
-            </>
-          )}
-
-          {compact && (
-            <div className="h-6 shrink-0 flex items-center">
-              <MediaVideoActions
-                video={current}
-                compact
-                onUpdated={(updated) => {
-                  setCurrent(updated);
-                  onVideoUpdated?.(updated);
-                }}
-              />
-            </div>
-          )}
+          <h3
+            className={`font-semibold text-gray-900 dark:text-gray-100 m-0 overflow-hidden ${
+              compact
+                ? 'text-xs line-clamp-2 leading-4 min-h-[2rem] max-h-[2rem]'
+                : 'text-sm line-clamp-2 leading-5 min-h-[2.5rem] max-h-[2.5rem]'
+            }`}
+          >
+            {displayName}
+          </h3>
+          <div className={compact ? 'h-6 shrink-0 flex items-center' : 'h-8 shrink-0 flex items-center'}>
+            <MediaVideoActions
+              video={current}
+              compact={compact}
+              onUpdated={(updated) => {
+                setCurrent(updated);
+                onVideoUpdated?.(updated);
+              }}
+            />
+          </div>
         </div>
       </article>
 
-      <MediaEditMetadataModal
-        open={editOpen}
-        file={current}
-        scanId={scan?.id}
-        facetTags={facetTags}
-        onClose={() => setEditOpen(false)}
-        onSaved={handleSaved}
-      />
+      {showEdit && (
+        <MediaEditMetadataModal
+          open={editOpen}
+          file={current}
+          scanId={scan?.id}
+          facetTags={facetTags}
+          onClose={() => setEditOpen(false)}
+          onSaved={handleSaved}
+        />
+      )}
     </>
   );
 }
