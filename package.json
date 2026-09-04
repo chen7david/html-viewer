@@ -1,23 +1,15 @@
 {
 	"name": "html-viewer",
+	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
-		"dev:api": "wrangler dev",
+		"dev": "npm run dev --prefix web",
 		"dev:web": "npm run dev --prefix web",
-		"init": "npm install && npm install --prefix web",
 		"build": "npm run build --prefix web",
-		"deploy": "wrangler deploy --minify",
-		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
-		"build:api": "wrangler build",
-		"build:web": "npm run build --prefix web"
-	},
-	"dependencies": {
-		"hono": "^4.12.8"
+		"preview": "npm run preview --prefix web",
+		"deploy": "wrangler pages deploy web/dist --project-name=html-viewer --branch=main"
 	},
 	"devDependencies": {
-		"@types/node": "^25.5.0",
-		"concurrently": "^9.2.1",
 		"wrangler": "^4.75.0"
 	}
 }

@@ -19,6 +19,26 @@ This tool is open-source and intended to help anyone stream-line handling raw HT
 ## Technology Stack
 
 - **Framework:** React 19 + Vite (Optimized for V8 Isolates & Cloudflare)
-- **Routing:** React Router v7 (HashRouter for serverless edge deployments)
+- **Routing:** React Router v7 (BrowserRouter with Cloudflare Pages SPA fallback)
 - **Styling:** Tailwind CSS v4 + Ant Design (ConfigProvider Themed)
 - **Code Engine:** `@monaco-editor/react` + `prettier`
+
+## Deployment
+
+This is a **Cloudflare Pages-only** application — no Worker or Pages Functions runtime is
+required. All documents, books, links, and settings live in the browser
+(`localStorage`/IndexedDB), and any AI calls go directly from the browser to the
+user-configured provider.
+
+- Production assets are built to `web/dist`.
+- `web/public/_redirects` provides the SPA fallback for client-side routes.
+- Merging to `main` deploys automatically via `.github/workflows/deploy.yml` to the
+  Cloudflare Pages project `html-viewer`.
+- The workflow needs two repository secrets:
+  `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+
+Local development:
+
+```bash
+npm run dev
+```
